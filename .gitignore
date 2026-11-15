@@ -1,0 +1,12 @@
+target/
+third_party/
+build/
+dist/
+tests/brave-profile/
+tests/audio/*.wav
+tests/audio/*.bin
+*.crx
+*.pem
+*.exe
+*.wav
+*.m4a

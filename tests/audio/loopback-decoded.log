@@ -1,0 +1,15 @@
+device=Speakers (Realtek USB Audio)
+loopback_channels=6
+loopback_rate=48000
+loopback_mask=0x3F
+loopback_float=True
+captured_frames=431520
+ch0_rms_db=-33.04 nonzero=59467
+ch1_rms_db=-27.37 nonzero=224984
+ch2_rms_db=-187.45 nonzero=0
+ch3_rms_db=-187.45 nonzero=0
+ch4_rms_db=-33.05 nonzero=59469
+ch5_rms_db=-27.37 nonzero=224982
+wrote=C:\Users\elad0\YT5.1\youtube-surround\tests\audio\loopback-decoded.wav
+active_channels=4
+RESULT=LOOPBACK_FEWER_THAN_6

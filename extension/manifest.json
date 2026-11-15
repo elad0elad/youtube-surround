@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Surround",
+  "version": "1.0.0",
+  "description": "Plays real YouTube IAMF as discrete 5.1. Stereo stays stereo. No upmix. © elad0elad",
+  "author": "elad0elad",
+  "homepage_url": "https://github.com/elad0elad/youtube-surround",
+  "permissions": ["nativeMessaging", "storage", "tabs"],
+  "host_permissions": ["https://www.youtube.com/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "YouTube Surround",
+    "default_popup": "popup.html"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkQSE5nfWsWzLdK/v2oZduSKLVqUrVLVRaKqdB1fGdXczvnnCV0nAMiizuJcwWFXjc7cAPztvgv6DnyhqpBQ9PyxOaxGa1oRHqY0uZ/U/i8AgVmRfqPb7DuUGHAvj88pSLEHO5zog+uffAOOLlvqE4GZQvHiX8K6zoIczXSp4giorFtAfxgcQDAdp0cDNvDx30zHBpIOLoxOFVXeXia7J5Hub8mLjWfU+4Ma8BjTZ8PHsBlOevQAKZ+3h4hdSJSfaIR5SOxUwUCTvtDIxyQ/5mRpXU8Bpgd6k5/Tk/O+Q/3h6lTKiB7o/q36hC0ZXTBMhtUeRv2GW5lSqKcX2INfqCwIDAQAB"
+}

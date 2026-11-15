@@ -1,0 +1,12 @@
+[package]
+name = "ys-iamf"
+version = "0.1.0"
+edition = "2021"
+description = "Decode YouTube IAMF-in-MP4 to discrete 5.1 PCM"
+authors = ["elad0elad"]
+license = "MIT"
+publish = false
+
+[dependencies]
+iamf-codecs = { path = "../../third_party/iamf-rs/crates/iamf-codecs", default-features = false, features = ["opus-ffi"] }
+iamf-dec = { path = "../../third_party/iamf-rs/crates/iamf-dec", default-features = false }

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <title>YouTube Surround — הפעלה / Getting started</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #12151b;
+      --card: #1b212b;
+      --line: #343b48;
+      --text: #f3f0e8;
+      --muted: #b7b2a8;
+      --gold: #d7c7a1;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 18px/1.6 "Segoe UI", sans-serif;
+    }
+    main {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+    }
+    h1 { font-size: 34px; line-height: 1.2; margin: 0 0 8px; }
+    h2 { margin: 36px 0 10px; font-size: 24px; }
+    h3 { margin: 22px 0 8px; font-size: 18px; }
+    .lead { color: var(--muted); margin: 0 0 28px; }
+    ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+    li {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 18px 20px;
+    }
+    .n { display: inline-block; min-width: 1.6em; color: var(--gold); font-weight: 700; }
+    code, .path {
+      font-family: Consolas, "Cascadia Mono", monospace;
+      direction: ltr;
+      unicode-bidi: isolate;
+    }
+    .path {
+      display: block;
+      margin-top: 10px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: #0e1116;
+      border: 1px solid var(--line);
+      color: var(--gold);
+      user-select: all;
+      word-break: break-all;
+    }
+    p { margin: 0 0 10px; }
+    .note { color: var(--muted); }
+    ul { margin: 8px 0 0; padding: 0 1.2em 0 0; }
+    a { color: var(--gold); }
+    .en {
+      margin-top: 56px;
+      padding-top: 36px;
+      border-top: 1px solid var(--line);
+      direction: ltr;
+      text-align: left;
+    }
+    .en ul, .en ol li { }
+    .en ul { padding: 0 0 0 1.2em; }
+    footer { margin-top: 36px; color: var(--muted); font-size: 15px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>YouTube Surround מותקן</h1>
+    <p class="lead">הרכיב של Windows כבר מוכן. נשאר לחבר את התוסף בדפדפן, פעם אחת. אותו הסבר באנגלית נמצא למטה.</p>
+
+    <h2>חיבור התוסף</h2>
+    <ol>
+      <li><span class="n">1.</span> בדף התוספים שנפתח, הפעילו <b>Developer mode</b> (מצב מפתח) בפינה הימנית העליונה. ב־Brave זה <code>brave://extensions</code>. ב־Chrome זה <code>chrome://extensions</code>.</li>
+      <li><span class="n">2.</span> לחצו <b>Load unpacked</b> (טעינה ללא אריזה).</li>
+      <li><span class="n">3.</span> בחרו את התיקייה הזו, לא קובץ שבתוכה. חלון של התיקייה נפתח כדי שאפשר יהיה לסמן אותה.
+        <span class="path">__EXT_PATH__</span>
+      </li>
+      <li><span class="n">4.</span> ודאו ש־<b>YouTube Surround</b> מופיע ברשימה ושהמתג שלו דולק. בתיאור כתוב <b>elad0elad</b>. בחלון של התוסף, בתחתית, מופיע <b>© 2026 elad0elad</b>.</li>
+      <li><span class="n">5.</span> פתחו סרטון ב־YouTube. סרטון שנבדק עם מקור IAMF אמיתי: <a href="https://www.youtube.com/watch?v=iMrnS6finbA">youtube.com/watch?v=iMrnS6finbA</a>. אחרי כמה שניות מופיע על הנגן <b>5.1 Active</b>.</li>
+    </ol>
+
+    <h2>מה אמור לקרות</h2>
+    <p>הדפדפן ממשיך להציג את התמונה. ששת ערוצי השמע יוצאים מתוכנית Windows נפרדת, מסונכרנים לשעון של הסרטון. בזמן ש־5.1 באמת מתנגן, הסטריאו של YouTube עצמו שקט, כדי שלא ישמעו שני מקורות יחד.</p>
+    <ul>
+      <li><b>5.1 Active</b> — נמצא מקור IAMF, הוא פוענח לשישה ערוצים, והם מתנגנים.</li>
+      <li><b>Stereo source</b> — לסרטון הזה אין מקור סראונד. נשאר הסטריאו המקורי. זו תוצאה תקינה, לא תקלה.</li>
+      <li><b>Surround unavailable</b> — Windows לא מוגדר ליציאת 5.1. הסרטון נשאר בסטריאו.</li>
+    </ul>
+
+    <h2>איך משתמשים</h2>
+    <p>לוחצים על סמל התוסף ליד שורת הכתובת.</p>
+    <ul>
+      <li><b>Automatic</b> בודק כל סרטון לבד. בלי מקור סראונד נשאר סטריאו.</li>
+      <li><b>Manual</b> מחכה ללחיצה על Play Surround. Stereo מחזיר את השמע של YouTube.</li>
+      <li>כפתור ההשתקה והמחוון של הנגן ביוטיוב שולטים גם בעוצמה של ה־5.1. הגברה בדפדפן מגבירה, הנמכה מנמיכה, והשתקה משתיקה.</li>
+      <li><b>Test speakers</b> משמיע צליל אחר בכל רמקול: קדמי שמאל 220 הרץ, קדמי ימין 277, מרכז 330, סאב 55, סראונד שמאל 440, סראונד ימין 554. כל צליל צריך לצאת מרמקול אחד בלבד.</li>
+    </ul>
+
+    <h2>מה צריך בשמע</h2>
+    <p class="note">Windows צריך להיות מוגדר לרמקולים ב־5.1, לא לאוזניות ולא ליציאת סטריאו. סדר החיבור: קדמי שמאל, קדמי ימין, מרכז, סאב, סראונד שמאל, סראונד ימין. אם ברירת המחדל היא סטריאו, התוסף משאיר את השמע של YouTube ולא ממציא 5.1.</p>
+
+    <h2>אם זה לא מתנגן</h2>
+    <ul>
+      <li>רעננו את הלשונית של YouTube אחרי טעינת התוסף.</li>
+      <li>בדקו ש־Windows מנגן דרך רמקולי ה־5.1.</li>
+      <li>הריצו Test speakers. אם צליל יוצא מהרמקול הלא נכון, סדר החיבור ב־Windows לא תואם.</li>
+      <li>אם מופיעה הודעה שהרכיב של Windows חסר, הריצו שוב את קובץ ההתקנה.</li>
+      <li>יומן: <span class="path">%LOCALAPPDATA%\YouTubeSurround\host.log</span></li>
+    </ul>
+
+    <h2>הסרה</h2>
+    <p>בדף התוספים הסירו את YouTube Surround. למחיקת הרכיב של Windows הריצו <code>uninstall.cmd</code> מתוך חבילת ההתקנה.</p>
+
+    <section class="en">
+      <h1>YouTube Surround is installed</h1>
+      <p class="lead">The Windows component is ready. One browser step remains, and it is done only once. The same guide in Hebrew is above.</p>
+
+      <h2>Turn the extension on</h2>
+      <ol>
+        <li><span class="n">1.</span> On the extensions page that opened, switch on <b>Developer mode</b> in the top-right corner. Brave uses <code>brave://extensions</code>. Chrome uses <code>chrome://extensions</code>.</li>
+        <li><span class="n">2.</span> Click <b>Load unpacked</b>.</li>
+        <li><span class="n">3.</span> Select this folder. Do not open it and pick a file inside. A window for the folder was opened so it can be selected.
+          <span class="path">__EXT_PATH__</span>
+        </li>
+        <li><span class="n">4.</span> Confirm that <b>YouTube Surround</b> is in the list and that its switch is on. The description includes <b>elad0elad</b>. The extension popup shows <b>© 2026 elad0elad</b> at the bottom.</li>
+        <li><span class="n">5.</span> Open a YouTube video. One video that was checked with a real IAMF source is <a href="https://www.youtube.com/watch?v=iMrnS6finbA">youtube.com/watch?v=iMrnS6finbA</a>. After a few seconds the player shows <b>5.1 Active</b>.</li>
+      </ol>
+
+      <h2>What should happen</h2>
+      <p>The browser keeps showing the picture. The six audio channels come from a separate Windows program and follow the video clock. While 5.1 is actually playing, YouTube's own stereo is silent, so the two sources are not heard together.</p>
+      <ul>
+        <li><b>5.1 Active</b> — an IAMF source was found, decoded to six channels, and is playing.</li>
+        <li><b>Stereo source</b> — this video has no surround source. Original stereo keeps playing. That is the correct result.</li>
+        <li><b>Surround unavailable</b> — Windows is not using a 5.1 output. The video stays stereo.</li>
+      </ul>
+
+      <h2>How to use it</h2>
+      <p>Click the extension icon next to the address bar.</p>
+      <ul>
+        <li><b>Automatic</b> checks every video. Without a surround source, playback stays stereo.</li>
+        <li><b>Manual</b> waits for Play Surround. Stereo returns YouTube's own audio.</li>
+        <li>YouTube's mute button and volume slider also control the 5.1 program. Raising the slider raises it, lowering the slider lowers it, and mute silences it.</li>
+        <li><b>Test speakers</b> plays a different tone on each speaker: front left 220 Hz, front right 277 Hz, center 330 Hz, LFE 55 Hz, surround left 440 Hz, surround right 554 Hz. Each tone should come from one speaker only.</li>
+      </ul>
+
+      <h2>Sound setup</h2>
+      <p class="note">Windows must be set to 5.1 speakers, not headphones and not a stereo output. Wiring order: front left, front right, center, subwoofer, surround left, surround right. If the default device is stereo, the extension leaves YouTube's audio alone and does not invent 5.1.</p>
+
+      <h2>If nothing plays in surround</h2>
+      <ul>
+        <li>Reload the YouTube tab after loading the extension.</li>
+        <li>Confirm Windows is using the 5.1 speakers.</li>
+        <li>Run Test speakers. A tone from the wrong speaker means the Windows speaker order does not match the wiring.</li>
+        <li>If the badge says the Windows component is missing, run the setup file again.</li>
+        <li>Log file: <span class="path">%LOCALAPPDATA%\YouTubeSurround\host.log</span></li>
+      </ul>
+
+      <h2>Remove</h2>
+      <p>On the extensions page, remove YouTube Surround. To delete the Windows component, run <code>uninstall.cmd</code> from the setup package.</p>
+
+      <h2>License</h2>
+      <p>YouTube Surround is open source under the MIT License. Copyright © 2026 elad0elad. Anyone may use, copy, and share it. Source: <a href="https://github.com/elad0elad/youtube-surround">github.com/elad0elad/youtube-surround</a>.</p>
+    </section>
+
+    <footer>© 2026 elad0elad · MIT License</footer>
+  </main>
+</body>
+</html>

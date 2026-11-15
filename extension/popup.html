@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+  <meta charset="utf-8" />
+  <title>YouTube Surround</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <div>
+      <h1>YouTube Surround</h1>
+      <p id="state">Waiting</p>
+    </div>
+    <label class="switch">
+      <input id="enabled" type="checkbox" checked />
+      <span>Enabled</span>
+    </label>
+  </header>
+  <section class="modes">
+    <button id="automatic" class="mode on" type="button">Automatic</button>
+    <button id="manual" class="mode" type="button">Manual</button>
+  </section>
+  <section class="actions">
+    <button id="start" type="button">Play Surround</button>
+    <button id="stop" type="button">Stereo</button>
+    <button id="tones" type="button">Test speakers</button>
+  </section>
+  <p id="detail"></p>
+  <details>
+    <summary>Advanced information</summary>
+    <dl id="advanced"></dl>
+  </details>
+  <footer>© 2026 elad0elad · MIT</footer>
+  <script src="popup.js"></script>
+</body>
+</html>
