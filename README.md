@@ -26,7 +26,7 @@ A one-hour soak was not run. Chrome Web Store submission needs the publisher's d
 
 ## Download
 
-The current Windows installer is [YouTube Surround 1.0.0](https://github.com/elad0elad/youtube-surround/releases/tag/v1.0.0). Run `YouTube Surround Setup.exe`. The guide opens when installation finishes.
+The current Windows installer is [YouTube Surround 1.0.0](https://github.com/elad0elad/youtube-surround/releases/tag/v1.0.0). Run `YouTube.Surround.Setup.exe`. The guide opens when installation finishes.
 
 ## Install
 
@@ -96,7 +96,7 @@ YouTube Surround משמיע זרם IAMF אמיתי מ־YouTube כשישה ערו
 
 ## הורדה
 
-קובץ ההתקנה ל־Windows נמצא בשחרור [YouTube Surround 1.0.0](https://github.com/elad0elad/youtube-surround/releases/tag/v1.0.0). מריצים את `YouTube Surround Setup.exe`. בסיום נפתח דף ההפעלה.
+קובץ ההתקנה ל־Windows נמצא בשחרור [YouTube Surround 1.0.0](https://github.com/elad0elad/youtube-surround/releases/tag/v1.0.0). מריצים את `YouTube.Surround.Setup.exe`. בסיום נפתח דף ההפעלה.
 
 ## התקנה
 
