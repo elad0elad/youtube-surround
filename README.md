@@ -24,7 +24,13 @@ A one-hour soak was not run. Chrome Web Store submission needs the publisher's d
 - Windows sound set to a 5.1 speaker configuration. The shared format of the output device must already be six channels. Headphones and stereo endpoints stay stereo. The extension will say surround is unavailable and leave YouTube's audio alone.
 - The speakers must be wired front left, front right, center, subwoofer, surround left, surround right.
 
+## Download
+
+The current Windows installer is [YouTube Surround 1.0.0](https://github.com/elad0elad/youtube-surround/releases/tag/v1.0.0). Run `YouTube Surround Setup.exe`. The guide opens when installation finishes.
+
 ## Install
+
+From a source checkout:
 
 1. Run `installer\install.cmd`. It copies the host, the decoder, yt-dlp, and Deno into `%LOCALAPPDATA%\YouTubeSurround`, and registers the native-messaging host for Chrome and Brave.
 2. Open `brave://extensions` or `chrome://extensions`.
@@ -88,7 +94,13 @@ YouTube Surround משמיע זרם IAMF אמיתי מ־YouTube כשישה ערו
 
 הדפדפן לבדו לא מוציא כאן שישה ערוצים. תוכנית Windows קטנה מורידה את אודיו ה־IAMF, מפענחת אותו, ומשמיעה אותו דרך WASAPI בהתקן שכבר מוגדר ל־5.1.
 
+## הורדה
+
+קובץ ההתקנה ל־Windows נמצא בשחרור [YouTube Surround 1.0.0](https://github.com/elad0elad/youtube-surround/releases/tag/v1.0.0). מריצים את `YouTube Surround Setup.exe`. בסיום נפתח דף ההפעלה.
+
 ## התקנה
+
+מתוך קוד המקור:
 
 1. מריצים את `installer\install.cmd`. הקבצים עוברים אל `%LOCALAPPDATA%\YouTubeSurround`, והרישום ל־Chrome ול־Brave נכתב אוטומטית.
 2. פותחים `brave://extensions` או `chrome://extensions`.
