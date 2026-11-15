@@ -14,7 +14,7 @@ Choose the output in the extension popup. The choice is saved.
 | --- | --- |
 | Auto Detect | The default Windows device is measured. Six channels use direct 5.1. Otherwise an active Windows Spatial Audio stream gets a 5.1 bed. Otherwise the audio is downmixed to stereo. |
 | 5.1 Speakers | Six discrete channels: front left, front right, center, LFE, surround left, surround right. |
-| Dolby Atmos Headphones | A 5.1 channel bed through Windows Spatial Audio, only when that stream actually opens. This is not object-based Dolby Atmos. |
+| Dolby Atmos Headphones | The 5.1 mix is sent through Dolby Atmos for Headphones when that is the Windows spatial format. |
 | Surround Headphones | Direct multichannel audio when the Windows device is already accepting six channels. |
 | Stereo Headphones | A downmix that keeps the center, the surrounds, and the LFE. |
 
@@ -24,7 +24,7 @@ Direct 5.1 needs a shared format that is already six channels. The speaker order
 
 ## Download
 
-The current Windows installer is [YouTube Surround 1.2.1](https://github.com/elad0elad/youtube-surround/releases/tag/v1.2.1). Run `YouTube.Surround.Setup.exe`. The guide opens when installation finishes.
+The current Windows installer is [YouTube Surround 1.2.2](https://github.com/elad0elad/youtube-surround/releases/tag/v1.2.2). Run `YouTube.Surround.Setup.exe`. The guide opens when installation finishes.
 
 ## Install from source
 
@@ -51,7 +51,7 @@ Run `installer\uninstall.cmd`, then remove YouTube Surround from the browser's e
 
 - Not every video has an IAMF stream. YouTube can change or remove it.
 - Seeking past the downloaded part plays YouTube's stereo until the external audio catches up.
-- The spatial mode sends a 5.1 bed. It does not send Dolby Atmos objects, and it opens only when Windows Spatial Audio accepts the stream.
+- Headphones whose Windows spatial format is Dolby Atmos for Headphones receive the 5.1 mix through that Dolby engine.
 - One visible YouTube tab owns the clock.
 - This is a per-user Windows install, not a Chrome Web Store package.
 
@@ -60,7 +60,7 @@ Run `installer\uninstall.cmd`, then remove YouTube Surround from the browser's e
 1. Install Rust with the `x86_64-pc-windows-gnu` toolchain and a static libopus. Set `OPUS_LIB_DIR` and `OPUS_STATIC=1`.
 2. Clone [iamf-rs](https://github.com/baylesj/iamf-rs) at commit `6527afa88918cf82ccc39d7b1399d893199d645c` into `third_party/iamf-rs`. It remains under its own BSD-3-Clause-Clear license.
 3. From `decoder/ys-iamf`, run `cargo build --release`.
-4. Compile `native/host/Host.cs` with the .NET Framework C# compiler, referencing `System.Web.Extensions.dll`.
+4. Compile `native/host/Host.cs` with the .NET Framework C# compiler, referencing `System.Web.Extensions.dll`, `System.Runtime.WindowsRuntime.dll`, and `Windows.Media.winmd`.
 5. Place `yt-dlp.exe` and `deno.exe` next to `installer/install.ps1`, then run `installer/install.cmd`.
 
 libopus is BSD licensed. yt-dlp is Unlicense. Deno is MIT. Those pieces are not part of the elad0elad copyright.
@@ -91,7 +91,7 @@ YouTube Surround משמיע זרם IAMF אמיתי מ־YouTube ב־Windows. אי
 | --- | --- |
 | Auto Detect | נבדק התקן ברירת המחדל. שישה ערוצים יוצאים כ־5.1 ישיר. אם Spatial Audio פעיל, נשלחת מיטת 5.1. אחרת מתנגן דאוןמיקס לסטריאו. |
 | 5.1 Speakers | שישה ערוצים נפרדים: קדמי שמאל, קדמי ימין, מרכז, סאב, סראונד שמאל, סראונד ימין. |
-| Dolby Atmos Headphones | מיטת 5.1 דרך Spatial Audio של Windows, רק כשהזרם באמת נפתח. זה לא Dolby Atmos מבוסס אובייקטים. |
+| Dolby Atmos Headphones | המיקס של 5.1 נשלח ל־Dolby Atmos for Headphones כשזה פורמט הסאונד המרחבי של Windows. |
 | Surround Headphones | פלט רב־ערוצי כשההתקן של Windows כבר מקבל שישה ערוצים. |
 | Stereo Headphones | דאוןמיקס ששומר על המרכז, הסראונד והסאב. |
 
@@ -101,7 +101,7 @@ YouTube Surround משמיע זרם IAMF אמיתי מ־YouTube ב־Windows. אי
 
 ## הורדה
 
-קובץ ההתקנה נמצא בשחרור [YouTube Surround 1.2.1](https://github.com/elad0elad/youtube-surround/releases/tag/v1.2.1). מריצים את `YouTube.Surround.Setup.exe`. בסיום נפתחות ההוראות.
+קובץ ההתקנה נמצא בשחרור [YouTube Surround 1.2.2](https://github.com/elad0elad/youtube-surround/releases/tag/v1.2.2). מריצים את `YouTube.Surround.Setup.exe`. בסיום נפתחות ההוראות.
 
 ## התקנה מקוד המקור
 

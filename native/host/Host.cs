@@ -13,6 +13,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Web.Script.Serialization;
+using Windows.Media.Audio;
 
 internal static class Host
 {
@@ -861,58 +862,38 @@ internal static class Host
             WaveFormat fmt = ReadMix(dev);
             DeviceChannels = fmt.Channels;
             SpatialAvailable = QuerySpatial(dev);
-            SpatialEngine = SpatialAvailable ? ReadSpatialEngine(dev) : "";
+            SpatialEngine = ReadWinRtSpatial(ReadId(dev));
+            if (SpatialEngine.Length == 0 && SpatialAvailable) SpatialEngine = ReadSpatialEngine(dev);
             bool six = fmt.Channels >= 6;
+            bool spatial = SpatialEngine.Length > 0 || SpatialAvailable;
             OutputError = "";
             if (OutputPreference == "stereo")
             {
                 OutputPath = "stereo-downmix";
                 RenderChannels = 2;
             }
-            else if (OutputPreference == "speakers51" || OutputPreference == "surroundHeadphones")
-            {
-                if (six)
-                {
-                    OutputPath = "discrete-5.1";
-                    RenderChannels = 6;
-                }
-                else
-                {
-                    OutputPath = "stereo-downmix";
-                    RenderChannels = 2;
-                    OutputError = DeviceName + " is presenting " + fmt.Channels + " channels, so direct 5.1 was not opened. Stereo downmix is playing instead.";
-                }
-            }
-            else if (OutputPreference == "atmos")
-            {
-                if (SpatialAvailable)
-                {
-                    OutputPath = "spatial-bed";
-                    RenderChannels = 6;
-                }
-                else
-                {
-                    OutputPath = "stereo-downmix";
-                    RenderChannels = 2;
-                    OutputError = "Windows Spatial Audio is not active on " + DeviceName + ". Stereo downmix is playing instead.";
-                }
-            }
-            else if (six)
+            else if (six && OutputPreference != "atmos")
             {
                 OutputPath = "discrete-5.1";
                 RenderChannels = 6;
             }
-            else if (SpatialAvailable)
+            else if (spatial)
             {
                 OutputPath = "spatial-bed";
                 RenderChannels = 6;
+            }
+            else if (OutputPreference == "speakers51" || OutputPreference == "surroundHeadphones" || OutputPreference == "atmos")
+            {
+                OutputPath = "stereo-downmix";
+                RenderChannels = 2;
+                OutputError = DeviceName + " is presenting " + fmt.Channels + " channels, and no Dolby or spatial format is active. Stereo downmix is playing instead.";
             }
             else
             {
                 OutputPath = "stereo-downmix";
                 RenderChannels = 2;
             }
-            Log("route " + OutputPreference + " -> " + OutputPath + " device=" + DeviceName + " ch=" + DeviceChannels + " spatial=" + SpatialAvailable);
+            Log("route " + OutputPreference + " -> " + OutputPath + " device=" + DeviceName + " ch=" + DeviceChannels + " engine=" + SpatialEngine);
         }
         catch (Exception ex)
         {
@@ -938,7 +919,9 @@ internal static class Host
         if (OutputPath == "spatial-bed")
         {
             string engine = string.IsNullOrEmpty(SpatialEngine) ? "Windows Spatial Audio" : SpatialEngine;
-            return "A 5.1 channel bed is playing through " + engine + " on " + DeviceName + ". This is not object-based Dolby Atmos." + tail + err;
+            if (engine.IndexOf("Dolby Atmos", StringComparison.OrdinalIgnoreCase) >= 0)
+                return engine + " is playing the 5.1 channels on " + DeviceName + "." + tail + err;
+            return "The 5.1 channels are playing through " + engine + " on " + DeviceName + "." + tail + err;
         }
         return "Stereo downmix is playing on " + DeviceName + "." + tail + err;
     }
@@ -1157,12 +1140,33 @@ internal static class Host
         finally { if (client != null) Marshal.ReleaseComObject(client); }
     }
 
+    private static string ReadWinRtSpatial(string mmDeviceId)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(mmDeviceId)) return "";
+            string swd = @"\\?\SWD#MMDEVAPI#" + mmDeviceId + "#{e6327cad-dcec-4949-ae8a-991e976a79d2}";
+            SpatialAudioDeviceConfiguration cfg = SpatialAudioDeviceConfiguration.GetForDeviceId(swd);
+            string active = cfg == null ? "" : cfg.ActiveSpatialAudioFormat;
+            Guid id;
+            if (string.IsNullOrEmpty(active) || !Guid.TryParse(active, out id)) return "";
+            return SpatialName(id);
+        }
+        catch (Exception ex)
+        {
+            Log("spatial format " + ex.Message);
+            return "";
+        }
+    }
+
     private static string ReadSpatialEngine(IMMDevice dev)
     {
         IPropertyStore store;
         if (dev.OpenPropertyStore(0, out store) != 0) return "";
         try
         {
+            string named = SpatialName(ReadPropertyGuid(store, new Guid("1da5d803-d492-4edd-8c23-e0c0ffee7f0e"), 2));
+            if (named.Length > 0) return named;
             int count;
             if (store.GetCount(out count) != 0) return "";
             string best = "";
@@ -1172,11 +1176,12 @@ internal static class Host
             {
                 PropertyKey key;
                 if (store.GetAt(i, out key) != 0) continue;
-                if (key.fmtid == new Guid("a45c254e-df1c-4efd-8020-67d146a850e0") && key.pid == 14) continue;
                 PropVariant value;
                 if (store.GetValue(ref key, out value) != 0) continue;
                 try
                 {
+                    string fromGuid = SpatialName(GuidOf(value));
+                    if (fromGuid.Length > 0) return fromGuid;
                     string text = null;
                     if (value.vt == 31 && value.p != IntPtr.Zero) text = Marshal.PtrToStringUni(value.p);
                     else if (value.vt == 8 && value.p != IntPtr.Zero) text = Marshal.PtrToStringBSTR(value.p);
@@ -1193,6 +1198,41 @@ internal static class Host
             return best;
         }
         finally { Marshal.ReleaseComObject(store); }
+    }
+
+    private static Guid ReadPropertyGuid(IPropertyStore store, Guid fmtid, int pid)
+    {
+        var key = new PropertyKey();
+        key.fmtid = fmtid;
+        key.pid = pid;
+        PropVariant value;
+        if (store.GetValue(ref key, out value) != 0) return Guid.Empty;
+        try { return GuidOf(value); }
+        finally { value.Clear(); }
+    }
+
+    private static Guid GuidOf(PropVariant value)
+    {
+        if (value.p == IntPtr.Zero) return Guid.Empty;
+        if (value.vt == 72) return (Guid)Marshal.PtrToStructure(value.p, typeof(Guid));
+        string text = null;
+        if (value.vt == 31) text = Marshal.PtrToStringUni(value.p);
+        else if (value.vt == 8) text = Marshal.PtrToStringBSTR(value.p);
+        if (string.IsNullOrEmpty(text)) return Guid.Empty;
+        Guid parsed;
+        if (Guid.TryParse(text.Trim(), out parsed)) return parsed;
+        return Guid.Empty;
+    }
+
+    private static string SpatialName(Guid id)
+    {
+        if (id == Guid.Empty) return "";
+        if (id == new Guid("1459AC38-3875-49BF-BB59-0FE80F4D395D")) return "Dolby Atmos for Headphones";
+        if (id == new Guid("4C81E564-C8EF-4AD9-9F2C-9EF995533790")) return "Dolby Atmos for Speakers";
+        if (id == new Guid("A289735D-FA3E-4E35-9D7D-B6F896ACB2E7")) return "Dolby Atmos for Home Theater";
+        if (id == new Guid("B53D940C-B846-4831-9F76-D102B9B725A0")) return "Windows Sonic for Headphones";
+        if (id == new Guid("4444ACB0-8DC0-4C2C-A0D8-2C76DB470F86")) return "DTS Headphone:X";
+        return "";
     }
 
     private static int SpatialScore(string text)

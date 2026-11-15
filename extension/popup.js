@@ -37,7 +37,8 @@ const pathLabels = {
 
 function render(status) {
   const activeLabel = pathLabels[status.outputPath] || "Playing";
-  document.getElementById("state").textContent = status.state === "active" ? activeLabel : (stateLabels[status.state] || status.state || "Waiting");
+  const dolby = status.outputPath === "spatial-bed" && /dolby atmos/i.test(status.spatialEngine || "");
+  document.getElementById("state").textContent = status.state === "active" ? (dolby ? "Dolby Atmos" : activeLabel) : (stateLabels[status.state] || status.state || "Waiting");
   document.getElementById("enabled").checked = status.enabled !== false;
   document.getElementById("automatic").classList.toggle("on", status.mode !== "manual");
   document.getElementById("manual").classList.toggle("on", status.mode === "manual");

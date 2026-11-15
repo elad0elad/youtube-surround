@@ -71,7 +71,7 @@ function paint(status) {
   const shown = state === "active" && !covered ? "buffering" : state;
   let label = labels[shown] || shown;
   if (shown === "active" && lastStatus.outputPath === "stereo-downmix") label = "Stereo downmix";
-  if (shown === "active" && lastStatus.outputPath === "spatial-bed") label = "Spatial bed";
+  if (shown === "active" && lastStatus.outputPath === "spatial-bed") label = /dolby atmos/i.test(lastStatus.spatialEngine || "") ? "Dolby Atmos" : "Spatial bed";
   if ((shown === "active" || shown === "buffering") && lastStatus.device) label += " · " + lastStatus.device;
   badge.textContent = label + (state === "error" && lastStatus.detail ? " — " + lastStatus.detail : "");
   badge.style.display = lastStatus.enabled === false ? "none" : "block";
