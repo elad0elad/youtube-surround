@@ -6,17 +6,6 @@ YouTube Surround plays a real IAMF surround stream from YouTube as six discrete 
 
 The browser alone does not deliver those six channels. A small Windows program next to the extension downloads the IAMF audio, decodes it, and plays it through WASAPI on a device whose shared format is already 5.1.
 
-## What was measured
-
-- A live download of `https://www.youtube.com/watch?v=iMrnS6finbA` (format 773, Samsung TV client) matched the known IAMF file byte for byte.
-- Decoding that file produced 6-channel PCM at 48 kHz. Compared with the AOMedia loudspeaker WAV, every sample was within 1 least-significant bit.
-- Playback opened `Speakers (Realtek USB Audio)` in 6 channels. A loopback recording of test tones put 220 Hz, 277 Hz, 330 Hz, 55 Hz, 440 Hz, and 554 Hz on one channel each, in the order front left, front right, center, LFE, surround left, surround right.
-- In Brave, the same video reached the badge **5.1 Active**, and YouTube's own stereo element was muted only while that playback was active.
-- `https://www.youtube.com/watch?v=jNQXAC9IVRw` has no format 773. The badge stayed **Stereo source**, and the video was not forced mute.
-- Pause, a seek, and a playback-rate change were delivered to the audio host.
-
-A one-hour soak was not run. Chrome Web Store submission needs the publisher's developer account. Lip-sync was checked by the host following the video clock, not by a microphone recording of the room.
-
 ## Requirements
 
 - Windows 10 or 11.
