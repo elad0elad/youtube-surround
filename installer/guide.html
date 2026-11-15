@@ -86,11 +86,12 @@
     </ol>
 
     <h2>מה אמור לקרות</h2>
-    <p>הדפדפן ממשיך להציג את התמונה. השמע מתחיל אחרי השניות הראשונות, והמשך של סרטון ארוך ממשיך לרדת בזמן הצפייה. בזמן ש־5.1 באמת מתנגן, הסטריאו של YouTube עצמו שקט. אם קופצים למקום שעוד לא ירד, נשמע בינתיים הסטריאו הרגיל.</p>
+    <p>הדפדפן ממשיך להציג את התמונה. השמע מתחיל אחרי השניות הראשונות, והמשך של סרטון ארוך ממשיך לרדת בזמן הצפייה. בזמן שהנגן החיצוני באמת מנגן, הסטריאו של YouTube עצמו שקט. אם קופצים למקום שעוד לא ירד, נשמע בינתיים הסטריאו הרגיל.</p>
     <ul>
-      <li><b>5.1 Active</b> — נמצא מקור IAMF, הוא פוענח לשישה ערוצים, והם מתנגנים.</li>
-      <li><b>Stereo source</b> — לסרטון הזה אין מקור סראונד. נשאר הסטריאו המקורי. זו תוצאה תקינה, לא תקלה.</li>
-      <li><b>Surround unavailable</b> — Windows לא מוגדר ליציאת 5.1. הסרטון נשאר בסטריאו.</li>
+      <li><b>5.1 Active</b> — נמצא מקור IAMF, והוא מתנגן כשישה ערוצים נפרדים.</li>
+      <li><b>Spatial bed</b> — אותם שישה ערוצים עוברים דרך Spatial Audio של Windows. זו מיטת ערוצים, לא אובייקטים של Dolby Atmos.</li>
+      <li><b>Stereo downmix</b> — השישה ערוצים מקופלים לסטריאו, כולל המרכז, הסראונד והסאב.</li>
+      <li><b>Stereo source</b> — לסרטון הזה אין מקור סראונד. נשאר הסטריאו המקורי.</li>
     </ul>
 
     <h2>איך משתמשים</h2>
@@ -98,18 +99,19 @@
     <ul>
       <li><b>Automatic</b> בודק כל סרטון לבד. בלי מקור סראונד נשאר סטריאו.</li>
       <li><b>Manual</b> מחכה ללחיצה על Play Surround. Stereo מחזיר את השמע של YouTube.</li>
-      <li>כפתור ההשתקה והמחוון של הנגן ביוטיוב שולטים גם בעוצמה של ה־5.1. הגברה בדפדפן מגבירה, הנמכה מנמיכה, והשתקה משתיקה.</li>
-      <li><b>Test speakers</b> משמיע צליל אחר בכל רמקול: קדמי שמאל 220 הרץ, קדמי ימין 277, מרכז 330, סאב 55, סראונד שמאל 440, סראונד ימין 554. כל צליל צריך לצאת מרמקול אחד בלבד.</li>
+      <li>תפריט הפלט: <b>Auto Detect</b>, <b>5.1 Speakers</b>, <b>Dolby Atmos Headphones</b>, <b>Surround Headphones</b>, <b>Stereo Headphones</b>. הבחירה נשמרת. מתחתיה מופיעים המצב שבאמת פעיל ושם ההתקן.</li>
+      <li>כפתור ההשתקה והמחוון של הנגן ביוטיוב שולטים גם בעוצמה של הנגן החיצוני.</li>
+      <li><b>Test Audio</b> משמיע צליל אחר בכל ערוץ: קדמי שמאל 220 הרץ, קדמי ימין 277, מרכז 330, סאב 55, סראונד שמאל 440, סראונד ימין 554.</li>
     </ul>
 
     <h2>מה צריך בשמע</h2>
-    <p class="note">Windows צריך להיות מוגדר לרמקולים ב־5.1, לא לאוזניות ולא ליציאת סטריאו. סדר החיבור: קדמי שמאל, קדמי ימין, מרכז, סאב, סראונד שמאל, סראונד ימין. אם ברירת המחדל היא סטריאו, התוסף משאיר את השמע של YouTube ולא ממציא 5.1.</p>
+    <p class="note">5.1 ישיר דורש שהתקן הפלט של Windows כבר יהיה בשישה ערוצים. סדר החיבור: קדמי שמאל, קדמי ימין, מרכז, סאב, סראונד שמאל, סראונד ימין. אוזניות סטריאו מקבלות דאוןמיקס. מצב Dolby Atmos Headphones נפתח רק אם Spatial Audio של Windows באמת זמין, והתוכן שנשלח הוא מיטת 5.1, לא זרם Atmos. אם המצב לא זמין, מתנגן דאוןמיקס ומופיעה הודעה.</p>
 
     <h2>אם זה לא מתנגן</h2>
     <ul>
       <li>רעננו את הלשונית של YouTube אחרי טעינת התוסף.</li>
-      <li>בדקו ש־Windows מנגן דרך רמקולי ה־5.1.</li>
-      <li>הריצו Test speakers. אם צליל יוצא מהרמקול הלא נכון, סדר החיבור ב־Windows לא תואם.</li>
+      <li>לרמקולים, בחרו 5.1 Speakers וודאו ש־Windows מנגן דרך יציאת שישה ערוצים.</li>
+      <li>הריצו Test Audio. אם צליל יוצא מהרמקול הלא נכון, סדר החיבור ב־Windows לא תואם.</li>
       <li>אם מופיעה הודעה שהרכיב של Windows חסר, הריצו שוב את קובץ ההתקנה.</li>
       <li>יומן: <span class="path">%LOCALAPPDATA%\YouTubeSurround\host.log</span></li>
     </ul>
@@ -133,11 +135,12 @@
       </ol>
 
       <h2>What should happen</h2>
-      <p>The browser keeps showing the picture. Sound starts after the first seconds, and the rest of a long video keeps downloading while it plays. While 5.1 is actually playing, YouTube's own stereo is silent. Seeking past the part that has downloaded plays the original stereo until surround catches up.</p>
+      <p>The browser keeps showing the picture. Sound starts after the first seconds, and the rest of a long video keeps downloading while it plays. While the external player is actually playing, YouTube's own stereo is silent. Seeking past the part that has downloaded plays the original stereo until playback catches up.</p>
       <ul>
-        <li><b>5.1 Active</b> — an IAMF source was found, decoded to six channels, and is playing.</li>
-        <li><b>Stereo source</b> — this video has no surround source. Original stereo keeps playing. That is the correct result.</li>
-        <li><b>Surround unavailable</b> — Windows is not using a 5.1 output. The video stays stereo.</li>
+        <li><b>5.1 Active</b> — an IAMF source was found and is playing as six separate channels.</li>
+        <li><b>Spatial bed</b> — those six channels are sent through Windows Spatial Audio. This is a channel bed, not Dolby Atmos objects.</li>
+        <li><b>Stereo downmix</b> — the six channels are folded to stereo, including center, surrounds, and LFE.</li>
+        <li><b>Stereo source</b> — this video has no surround source. Original stereo keeps playing.</li>
       </ul>
 
       <h2>How to use it</h2>
@@ -145,18 +148,19 @@
       <ul>
         <li><b>Automatic</b> checks every video. Without a surround source, playback stays stereo.</li>
         <li><b>Manual</b> waits for Play Surround. Stereo returns YouTube's own audio.</li>
-        <li>YouTube's mute button and volume slider also control the 5.1 program. Raising the slider raises it, lowering the slider lowers it, and mute silences it.</li>
-        <li><b>Test speakers</b> plays a different tone on each speaker: front left 220 Hz, front right 277 Hz, center 330 Hz, LFE 55 Hz, surround left 440 Hz, surround right 554 Hz. Each tone should come from one speaker only.</li>
+        <li>The output menu has <b>Auto Detect</b>, <b>5.1 Speakers</b>, <b>Dolby Atmos Headphones</b>, <b>Surround Headphones</b>, and <b>Stereo Headphones</b>. The choice is saved. Under it, the popup shows the route that is actually active and the device name.</li>
+        <li>YouTube's mute button and volume slider also control the external player.</li>
+        <li><b>Test Audio</b> plays a different tone on each channel: front left 220 Hz, front right 277 Hz, center 330 Hz, LFE 55 Hz, surround left 440 Hz, surround right 554 Hz.</li>
       </ul>
 
       <h2>Sound setup</h2>
-      <p class="note">Windows must be set to 5.1 speakers, not headphones and not a stereo output. Wiring order: front left, front right, center, subwoofer, surround left, surround right. If the default device is stereo, the extension leaves YouTube's audio alone and does not invent 5.1.</p>
+      <p class="note">Direct 5.1 needs a Windows output whose shared format is already six channels. Wiring order: front left, front right, center, subwoofer, surround left, surround right. Stereo headphones receive a downmix. Dolby Atmos Headphones opens only when Windows Spatial Audio is actually available, and the signal is a 5.1 bed, not an Atmos object stream. If that mode is unavailable, playback falls back to the downmix and the popup says so.</p>
 
       <h2>If nothing plays in surround</h2>
       <ul>
         <li>Reload the YouTube tab after loading the extension.</li>
-        <li>Confirm Windows is using the 5.1 speakers.</li>
-        <li>Run Test speakers. A tone from the wrong speaker means the Windows speaker order does not match the wiring.</li>
+        <li>For speakers, choose 5.1 Speakers and confirm Windows is using a six-channel output.</li>
+        <li>Run Test Audio. A tone from the wrong speaker means the Windows speaker order does not match the wiring.</li>
         <li>If the badge says the Windows component is missing, run the setup file again.</li>
         <li>Log file: <span class="path">%LOCALAPPDATA%\YouTubeSurround\host.log</span></li>
       </ul>

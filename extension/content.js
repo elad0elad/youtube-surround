@@ -69,7 +69,10 @@ function paint(status) {
   const state = lastStatus.state || "idle";
   const covered = bufferCoversPlayhead();
   const shown = state === "active" && !covered ? "buffering" : state;
-  badge.textContent = (labels[shown] || shown) + (state === "error" && lastStatus.detail ? " — " + lastStatus.detail : "");
+  let label = labels[shown] || shown;
+  if (shown === "active" && lastStatus.outputPath === "stereo-downmix") label = "Stereo downmix";
+  if (shown === "active" && lastStatus.outputPath === "spatial-bed") label = "Spatial bed";
+  badge.textContent = label + (state === "error" && lastStatus.detail ? " — " + lastStatus.detail : "");
   badge.style.display = lastStatus.enabled === false ? "none" : "block";
   const holdBrowserStereo = state === "active" && covered && !adShowing();
   setStereoAudible(!holdBrowserStereo);

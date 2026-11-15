@@ -5,13 +5,22 @@ let status = {
   state: "idle",
   enabled: true,
   mode: "automatic",
+  output: "auto",
   detail: "Waiting for a YouTube video."
 };
 let activeTabId = null;
 
-chrome.storage.local.get({ enabled: true, mode: "automatic" }, (saved) => {
+function normalizeOutput(value) {
+  if (value === "speakers51" || value === "atmos" || value === "surroundHeadphones" || value === "stereo") return value;
+  return "auto";
+}
+
+chrome.storage.local.get({ enabled: true, mode: "automatic", output: "auto" }, (saved) => {
   status.enabled = saved.enabled !== false;
   status.mode = saved.mode === "manual" ? "manual" : "automatic";
+  status.output = normalizeOutput(saved.output);
+  if (port) send({ type: "set-output", output: status.output });
+  broadcast();
 });
 
 function broadcast() {
@@ -40,10 +49,12 @@ function connect() {
     if (!message || message.type !== "status") return;
     status = Object.assign({}, status, message, {
       enabled: status.enabled,
-      mode: status.mode
+      mode: status.mode,
+      output: status.output
     });
     broadcast();
   });
+  try { port.postMessage({ type: "set-output", output: status.output || "auto" }); } catch (err) {}
   port.onDisconnect.addListener(() => {
     const reason = chrome.runtime.lastError && chrome.runtime.lastError.message;
     connectFailedAt = Date.now();
@@ -72,13 +83,16 @@ chrome.runtime.onConnect.addListener(() => {});
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || !message.type) return;
   if (message.type === "getStatus") {
+    connect();
     sendResponse(status);
     return;
   }
   if (message.type === "setPrefs") {
     if (typeof message.enabled === "boolean") status.enabled = message.enabled;
     if (message.mode === "automatic" || message.mode === "manual") status.mode = message.mode;
-    chrome.storage.local.set({ enabled: status.enabled, mode: status.mode });
+    if (typeof message.output === "string") status.output = normalizeOutput(message.output);
+    chrome.storage.local.set({ enabled: status.enabled, mode: status.mode, output: status.output });
+    if (typeof message.output === "string") send({ type: "set-output", output: status.output });
     if (!status.enabled) send({ type: "stop" });
     broadcast();
     sendResponse(status);

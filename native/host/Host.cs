@@ -1,7 +1,8 @@
 // YouTube Surround native host.
 // Speaks Chrome native messaging on stdin/stdout, downloads an IAMF audio
 // stream with yt-dlp's Samsung TV client, decodes it to 6-channel PCM, and
-// plays that PCM on a WASAPI endpoint whose shared format really is 5.1.
+// plays that PCM through the output route selected in the extension:
+// direct 5.1, a 5.1 bed on Windows Spatial Audio, or a stereo downmix.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -40,6 +41,14 @@ internal static class Host
     private static bool PlayTones;
     private static double CliStopAt = -1;
     private static volatile int OutputMilli = 1000;
+    private static string OutputPreference = "auto";
+    private static string OutputPath = "";
+    private static string Rendering = "";
+    private static string OutputError = "";
+    private static string SpatialEngine = "";
+    private static bool SpatialAvailable;
+    private static int RenderChannels;
+    private static volatile int OutputGeneration;
 
     private static int Main(string[] args)
     {
@@ -52,6 +61,9 @@ internal static class Host
         {
             if (args.Length > 0 && args[0] == "play-url") return PlayUrl(args);
             if (args.Length > 0 && args[0] == "tones") { PlayGeneratedTones(Arg(args, "--seconds", 8)); return 0; }
+            if (args.Length > 0 && args[0] == "probe") return Probe(args);
+            if (args.Length > 0 && args[0] == "downmix-check") return DownmixCheck();
+            if (args.Length > 0 && args[0] == "render-check") return RenderCheck(args);
             return NativeLoop();
         }
         catch (Exception ex)
@@ -69,8 +81,9 @@ internal static class Host
         if (url == null) { Console.Error.WriteLine("missing url"); return 2; }
         double start = ArgD(args, "--start", 0);
         int seconds = Arg(args, "--seconds", 0);
-        PrepareDevice();
-        if (DeviceChannels < 6)
+        OutputPreference = "speakers51";
+        ResolveRoute();
+        if (OutputPath != "discrete-5.1")
         {
             Console.WriteLine("RESULT=DEVICE_NOT_5_1 channels=" + DeviceChannels + " device=" + DeviceName);
             return 3;
@@ -120,7 +133,8 @@ internal static class Host
     {
         Stdout = Console.OpenStandardOutput();
         Stream stdin = Console.OpenStandardInput();
-        PrepareDevice();
+        LoadOutputPreference();
+        ResolveRoute();
         Publish();
         var player = new Thread(PlayerLoop);
         player.IsBackground = true;
@@ -156,11 +170,25 @@ internal static class Host
             Publish();
             return;
         }
+        if (type == "set-output")
+        {
+            string mode = NormalizeOutput(Str(msg, "output"));
+            if (mode != OutputPreference)
+            {
+                OutputPreference = mode;
+                SaveOutputPreference();
+                OutputGeneration++;
+            }
+            ResolveRoute();
+            if (State == "active") Detail = PlayingDetail(true);
+            Publish();
+            return;
+        }
         if (type == "tones")
         {
             PlayTones = true;
             State = "active";
-            Detail = "Playing a different tone on each speaker.";
+            Detail = "Playing test tones through " + OutputPath + ".";
             Publish();
             return;
         }
@@ -202,14 +230,7 @@ internal static class Host
     {
         try
         {
-            if (DeviceChannels < 6)
-            {
-                ClearMeasured();
-                State = "unavailable";
-                Detail = "Windows is not using a 5.1 device (" + DeviceName + ", " + DeviceChannels + " channels). Stereo continues.";
-                Publish();
-                return;
-            }
+            ResolveRoute();
             ClearMeasured();
             State = "checking";
             Detail = "Looking for an IAMF audio stream.";
@@ -298,7 +319,7 @@ internal static class Host
                     WavPath = wav;
                     OutputChannels = 6;
                     State = "active";
-                    Detail = "5.1 is playing while the rest of the audio downloads.";
+                    Detail = PlayingDetail(true);
                     Publish();
                     lastPublished = seconds;
                 }
@@ -330,7 +351,7 @@ internal static class Host
         }
         if (decode.HasExited && decode.ExitCode == 0)
         {
-            Detail = "5.1 is playing. YouTube's stereo track is muted.";
+            Detail = PlayingDetail(false);
             Publish(false);
         }
         Log("stream finished ready=" + ready);
@@ -396,6 +417,7 @@ internal static class Host
     private static void PlayerLoop()
     {
         CoInitializeEx(IntPtr.Zero, 0);
+        int playFailures = 0;
         while (Running)
         {
             if (PlayTones)
@@ -414,15 +436,29 @@ internal static class Host
                 clock = ClockNow;
                 stopAt = CliStopAt;
             }
-            if (string.IsNullOrEmpty(wav) || !File.Exists(wav) || State != "active")
+            if (string.IsNullOrEmpty(wav) || !File.Exists(wav) || (State != "active" && State != "unavailable"))
             {
                 Thread.Sleep(30);
                 continue;
             }
-            try { PlayWavFollowClock(wav, clock, stopAt); }
+            try
+            {
+                PlayWavFollowClock(wav, clock, stopAt);
+                playFailures = 0;
+            }
             catch (Exception ex)
             {
+                playFailures++;
                 Log("play " + ex.Message);
+                if (playFailures < 5 && !string.IsNullOrEmpty(WavPath))
+                {
+                    State = "unavailable";
+                    Detail = "Output was interrupted (" + ex.Message + "). YouTube stereo continues until audio returns.";
+                    Publish();
+                    Thread.Sleep(500);
+                    ResolveRoute();
+                    continue;
+                }
                 State = "error";
                 Detail = "Playback failed: " + ex.Message;
                 Publish();
@@ -434,6 +470,26 @@ internal static class Host
 
     private static void PlayWavFollowClock(string path, Clock initial, double stopAt)
     {
+        if (OutputPath == "spatial-bed")
+        {
+            try
+            {
+                PlaySpatial(path, stopAt);
+                return;
+            }
+            catch (Exception ex)
+            {
+                if (IsTransient(ex)) throw;
+                Log("spatial fallback " + ex.Message);
+                lock (Gate)
+                {
+                    OutputPath = "stereo-downmix";
+                    RenderChannels = 2;
+                    OutputError = "Spatial Audio did not start (" + ex.Message + "). Stereo downmix is playing instead.";
+                }
+                Publish();
+            }
+        }
         FileStream fs = null;
         try
         {
@@ -444,7 +500,10 @@ internal static class Host
             int rate = BitConverter.ToInt32(header, 24);
             if (channels != 6) throw new InvalidOperationException("wav has " + channels + " channels");
             SampleRate = rate;
-            IMMDevice dev = PickDevice();
+            int generation = OutputGeneration;
+            IMMDevice dev = PickDevice(OutputPreference == "speakers51" && OutputPath == "discrete-5.1");
+            string openedId = ReadId(dev);
+            int lastDeviceTick = Environment.TickCount;
             IAudioClient client = Activate(dev);
             IntPtr mix = IntPtr.Zero;
             IAudioRenderClient render = null;
@@ -454,8 +513,16 @@ internal static class Host
                 WaveFormat fmt = WaveFormat.Read(mix);
                 DeviceName = ReadName(dev);
                 DeviceChannels = fmt.Channels;
-                if (fmt.Channels < 6)
-                    throw new InvalidOperationException("device mix is " + fmt.Channels + " channels");
+                if (fmt.Channels < 6 && OutputPath != "stereo-downmix")
+                {
+                    lock (Gate)
+                    {
+                        OutputPath = "stereo-downmix";
+                        RenderChannels = 2;
+                        OutputError = "This device mix is " + fmt.Channels + " channels, so direct 5.1 was not opened. Stereo downmix is playing instead.";
+                    }
+                }
+                Rendering = OutputPath == "stereo-downmix" ? "stereo-downmix" : "discrete-5.1";
                 int[] map = MapToDevice(fmt.ChannelMask, fmt.Channels);
                 long period, minPeriod;
                 Marshal.ThrowExceptionForHR(client.GetDevicePeriod(out period, out minPeriod));
@@ -471,10 +538,20 @@ internal static class Host
                 render = (IAudioRenderClient)Marshal.GetObjectForIUnknown(rp);
                 Marshal.Release(rp);
                 Marshal.ThrowExceptionForHR(client.Start());
+                if (State == "unavailable")
+                {
+                    State = "active";
+                    Detail = PlayingDetail(true);
+                }
                 Publish();
                 var frame = new byte[channels * 2];
-                while (Running && WavPath == path && !PlayTones)
+                while (Running && WavPath == path && !PlayTones && OutputGeneration == generation)
                 {
+                    if (unchecked(Environment.TickCount - lastDeviceTick) > 1000)
+                    {
+                        lastDeviceTick = Environment.TickCount;
+                        if (!SameEndpoint(openedId)) throw new InvalidOperationException("device changed");
+                    }
                     Clock clock;
                     lock (Gate) clock = ClockNow;
                     double media = clock.MediaSeconds();
@@ -514,14 +591,7 @@ internal static class Host
                                     if (framesGot == 0) Thread.Sleep(30);
                                 }
                                 for (int i = 0; i < framesGot; i++)
-                                {
-                                    for (int c = 0; c < 6; c++)
-                                    {
-                                        if (map[c] < 0 || map[c] >= fmt.Channels) continue;
-                                        short s = BitConverter.ToInt16(block, i * frame.Length + c * 2);
-                                        dst[i * fmt.Channels + map[c]] = s / 32768f * (OutputMilli / 1000f);
-                                    }
-                                }
+                                    WriteBed(dst, i, fmt, map, block, i * frame.Length);
                             }
                         }
                         else
@@ -538,12 +608,7 @@ internal static class Host
                                     fs = null;
                                     break;
                                 }
-                                for (int c = 0; c < 6; c++)
-                                {
-                                    if (map[c] < 0 || map[c] >= fmt.Channels) continue;
-                                    short s = BitConverter.ToInt16(frame, c * 2);
-                                    dst[i * fmt.Channels + map[c]] = s / 32768f * (OutputMilli / 1000f);
-                                }
+                                WriteBed(dst, i, fmt, map, frame, 0);
                             }
                         }
                     }
@@ -571,8 +636,7 @@ internal static class Host
 
     private static void PlayGeneratedTones(int seconds)
     {
-        PrepareDevice();
-        if (DeviceChannels < 6) throw new InvalidOperationException("no 5.1 device");
+        ResolveRoute();
         int rate = 48000;
         int frames = rate * seconds;
         float[] pcm = new float[frames * 6];
@@ -596,7 +660,7 @@ internal static class Host
         string previousDetail = Detail;
         WavPath = path;
         State = "active";
-        Detail = "Playing a different tone on each speaker.";
+        Detail = "Playing test tones through " + OutputPath + ".";
         lock (Gate) { ClockNow = new Clock { Time = 0, Rate = 1, Paused = false, Mono = Stopwatch.GetTimestamp() }; CliStopAt = seconds; }
         PlayWavFollowClock(path, ClockNow, seconds);
         WavPath = previous;
@@ -642,6 +706,7 @@ internal static class Host
         string m4a = M4aPath;
         WavPath = null;
         M4aPath = null;
+        Rendering = "";
         KillTree(Child);
         KillTree(DownloadProc);
         KillTree(DecodeProc);
@@ -719,12 +784,20 @@ internal static class Host
             { "detail", Detail },
             { "videoId", VideoId ?? "" },
             { "device", DeviceName ?? "" },
+            { "deviceChannels", DeviceChannels },
             { "channelsOut", OutputChannels },
+            { "renderChannels", RenderChannels },
             { "sampleRate", SampleRate },
             { "latencyMs", Math.Round(LatencyMs, 1) },
             { "sourceFormat", OutputChannels == 6 ? "773" : "" },
             { "sourceCodec", OutputChannels == 6 ? "iamf.001.001.Opus" : "" },
-            { "layout", OutputChannels == 6 ? "5.1" : "" },
+            { "layout", LayoutName() },
+            { "outputMode", OutputPreference },
+            { "outputPath", OutputPath ?? "" },
+            { "rendering", Rendering ?? "" },
+            { "spatialAvailable", SpatialAvailable },
+            { "spatialEngine", SpatialEngine ?? "" },
+            { "outputError", OutputError ?? "" },
             { "mix", MixId >= 0 ? MixId.ToString(CultureInfo.InvariantCulture) : "" },
             { "decoder", OutputChannels == 6 ? "iamf-rs sound system B" : "" }
         };
@@ -749,21 +822,569 @@ internal static class Host
         }
     }
 
-    private static void PrepareDevice()
+    private static void ResolveRoute()
     {
+        IMMDevice dev = null;
         try
         {
-            IMMDevice dev = PickDevice();
+            bool preferSix = OutputPreference == "speakers51";
+            dev = PickDevice(preferSix);
             DeviceName = ReadName(dev);
-            DeviceChannels = MixChannels(dev);
-            Marshal.ReleaseComObject(dev);
+            WaveFormat fmt = ReadMix(dev);
+            DeviceChannels = fmt.Channels;
+            SpatialAvailable = QuerySpatial(dev);
+            SpatialEngine = SpatialAvailable ? ReadSpatialEngine(dev) : "";
+            bool six = fmt.Channels >= 6;
+            OutputError = "";
+            if (OutputPreference == "stereo")
+            {
+                OutputPath = "stereo-downmix";
+                RenderChannels = 2;
+            }
+            else if (OutputPreference == "speakers51" || OutputPreference == "surroundHeadphones")
+            {
+                if (six)
+                {
+                    OutputPath = "discrete-5.1";
+                    RenderChannels = 6;
+                }
+                else
+                {
+                    OutputPath = "stereo-downmix";
+                    RenderChannels = 2;
+                    OutputError = DeviceName + " is presenting " + fmt.Channels + " channels, so direct 5.1 was not opened. Stereo downmix is playing instead.";
+                }
+            }
+            else if (OutputPreference == "atmos")
+            {
+                if (SpatialAvailable)
+                {
+                    OutputPath = "spatial-bed";
+                    RenderChannels = 6;
+                }
+                else
+                {
+                    OutputPath = "stereo-downmix";
+                    RenderChannels = 2;
+                    OutputError = "Windows Spatial Audio is not active on " + DeviceName + ". Stereo downmix is playing instead.";
+                }
+            }
+            else if (six)
+            {
+                OutputPath = "discrete-5.1";
+                RenderChannels = 6;
+            }
+            else if (SpatialAvailable)
+            {
+                OutputPath = "spatial-bed";
+                RenderChannels = 6;
+            }
+            else
+            {
+                OutputPath = "stereo-downmix";
+                RenderChannels = 2;
+            }
+            Log("route " + OutputPreference + " -> " + OutputPath + " device=" + DeviceName + " ch=" + DeviceChannels + " spatial=" + SpatialAvailable);
         }
         catch (Exception ex)
         {
-            DeviceName = "unavailable";
+            DeviceName = string.IsNullOrEmpty(DeviceName) ? "unavailable" : DeviceName;
             DeviceChannels = 0;
-            Log("device " + ex.Message);
+            OutputPath = "stereo-downmix";
+            RenderChannels = 2;
+            SpatialAvailable = false;
+            OutputError = "The output device could not be opened (" + ex.Message + ").";
+            Log("route " + ex.Message);
         }
+        finally
+        {
+            if (dev != null) Marshal.ReleaseComObject(dev);
+        }
+    }
+
+    private static string PlayingDetail(bool downloading)
+    {
+        string tail = downloading ? " The rest of the audio is still downloading." : " YouTube's stereo track is muted.";
+        string err = string.IsNullOrEmpty(OutputError) ? "" : " " + OutputError;
+        if (OutputPath == "discrete-5.1") return "Direct 5.1 is playing on " + DeviceName + "." + tail + err;
+        if (OutputPath == "spatial-bed")
+        {
+            string engine = string.IsNullOrEmpty(SpatialEngine) ? "Windows Spatial Audio" : SpatialEngine;
+            return "A 5.1 channel bed is playing through " + engine + " on " + DeviceName + ". This is not object-based Dolby Atmos." + tail + err;
+        }
+        return "Stereo downmix is playing on " + DeviceName + "." + tail + err;
+    }
+
+    private static string LayoutName()
+    {
+        if (OutputChannels != 6) return "";
+        if (OutputPath == "discrete-5.1") return "5.1";
+        if (OutputPath == "spatial-bed") return "spatial-bed";
+        if (OutputPath == "stereo-downmix") return "stereo-downmix";
+        return "";
+    }
+
+    private static string NormalizeOutput(string value)
+    {
+        if (value == "speakers51" || value == "atmos" || value == "surroundHeadphones" || value == "stereo") return value;
+        return "auto";
+    }
+
+    private static string OutputPreferenceFile()
+    {
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "YouTubeSurround", "output-mode.txt");
+    }
+
+    private static void LoadOutputPreference()
+    {
+        try
+        {
+            string path = OutputPreferenceFile();
+            if (File.Exists(path)) OutputPreference = NormalizeOutput(File.ReadAllText(path).Trim());
+        }
+        catch (Exception ex) { Log("output pref " + ex.Message); }
+    }
+
+    private static void SaveOutputPreference()
+    {
+        try { File.WriteAllText(OutputPreferenceFile(), OutputPreference); }
+        catch (Exception ex) { Log("output pref save " + ex.Message); }
+    }
+
+    private static void Downmix(float fl, float fr, float fc, float lfe, float sl, float sr, out float left, out float right)
+    {
+        const float center = 0.7071f;
+        const float surround = 0.7071f;
+        const float low = 0.5f;
+        const float scale = 1f / (1f + 0.7071f + 0.7071f + 0.5f);
+        left = (fl + center * fc + surround * sl + low * lfe) * scale;
+        right = (fr + center * fc + surround * sr + low * lfe) * scale;
+    }
+
+    private static int DownmixCheck()
+    {
+        float l, r;
+        Downmix(0, 0, 1, 0, 0, 0, out l, out r);
+        if (Math.Abs(l - r) > 0.0001f || l <= 0) return DownmixFail("center");
+        Downmix(1, 0, 0, 0, 0, 0, out l, out r);
+        if (l <= 0.2f || Math.Abs(r) > 0.0001f) return DownmixFail("front-left");
+        Downmix(0, 1, 0, 0, 0, 0, out l, out r);
+        if (r <= 0.2f || Math.Abs(l) > 0.0001f) return DownmixFail("front-right");
+        Downmix(0, 0, 0, 1, 0, 0, out l, out r);
+        if (Math.Abs(l - r) > 0.0001f || l <= 0) return DownmixFail("lfe");
+        Downmix(0, 0, 0, 0, 1, 0, out l, out r);
+        if (l <= 0 || Math.Abs(r) > 0.0001f) return DownmixFail("surround-left");
+        Downmix(0, 0, 0, 0, 0, 1, out l, out r);
+        if (r <= 0 || Math.Abs(l) > 0.0001f) return DownmixFail("surround-right");
+        Downmix(1, 1, 1, 1, 1, 1, out l, out r);
+        if (l > 1.0001f || r > 1.0001f || l < 0.99f || Math.Abs(l - r) > 0.0001f) return DownmixFail("full-scale");
+        Console.WriteLine("RESULT=DOWNMIX_OK");
+        return 0;
+    }
+
+    private static int DownmixFail(string name)
+    {
+        Console.WriteLine("RESULT=DOWNMIX_FAIL " + name);
+        return 1;
+    }
+
+    private static int Probe(string[] args)
+    {
+        OutputPreference = args.Length > 1 ? NormalizeOutput(args[1]) : "auto";
+        ResolveRoute();
+        Console.WriteLine("preference=" + OutputPreference);
+        Console.WriteLine("path=" + OutputPath);
+        Console.WriteLine("device=" + DeviceName);
+        Console.WriteLine("deviceChannels=" + DeviceChannels);
+        Console.WriteLine("renderChannels=" + RenderChannels);
+        Console.WriteLine("spatialAvailable=" + (SpatialAvailable ? "true" : "false"));
+        Console.WriteLine("spatialEngine=" + SpatialEngine);
+        Console.WriteLine("outputError=" + OutputError);
+        Console.WriteLine("RESULT=PROBE_OK");
+        return 0;
+    }
+
+    private static int RenderCheck(string[] args)
+    {
+        OutputPreference = args.Length > 1 ? NormalizeOutput(args[1]) : "auto";
+        string requested = OutputPreference;
+        ResolveRoute();
+        string planned = OutputPath;
+        int rate = 48000;
+        int frames = rate / 5;
+        float[] pcm = new float[frames * 6];
+        for (int i = 0; i < frames; i++)
+        {
+            double t = (double)i / rate;
+            pcm[i * 6] = (float)(0.04 * Math.Sin(2 * Math.PI * 440 * t));
+            pcm[i * 6 + 2] = (float)(0.04 * Math.Sin(2 * Math.PI * 330 * t));
+            pcm[i * 6 + 3] = (float)(0.04 * Math.Sin(2 * Math.PI * 55 * t));
+        }
+        string path = Path.Combine(Path.GetTempPath(), "ys-render-check.wav");
+        WriteWav(path, pcm, 6, rate);
+        WavPath = path;
+        State = "active";
+        lock (Gate) { ClockNow = new Clock { Time = 0, Rate = 1, Paused = false, Mono = Stopwatch.GetTimestamp() }; }
+        try { PlayWavFollowClock(path, ClockNow, 0.2); }
+        finally
+        {
+            WavPath = null;
+            TryDelete(path);
+        }
+        Console.WriteLine("preference=" + requested);
+        Console.WriteLine("planned=" + planned);
+        Console.WriteLine("path=" + OutputPath);
+        Console.WriteLine("rendering=" + Rendering);
+        Console.WriteLine("device=" + DeviceName);
+        Console.WriteLine("renderChannels=" + RenderChannels);
+        Console.WriteLine("outputError=" + OutputError);
+        string result = "RENDER_FAILED";
+        if (Rendering == "discrete-5.1") result = "DISCRETE_RENDERED";
+        else if (Rendering == "spatial-bed") result = "SPATIAL_RENDERED";
+        else if (Rendering == "stereo-downmix") result = "DOWNMIX_RENDERED";
+        Console.WriteLine("RESULT=" + result);
+        return Rendering == planned && planned.Length > 0 ? 0 : 2;
+    }
+
+    private static void WriteBed(float[] dst, int frameIndex, WaveFormat fmt, int[] map, byte[] src, int offset)
+    {
+        float gain = OutputMilli / 1000f;
+        if (OutputPath == "stereo-downmix")
+        {
+            float left, right;
+            Downmix(
+                BitConverter.ToInt16(src, offset) / 32768f * gain,
+                BitConverter.ToInt16(src, offset + 2) / 32768f * gain,
+                BitConverter.ToInt16(src, offset + 4) / 32768f * gain,
+                BitConverter.ToInt16(src, offset + 6) / 32768f * gain,
+                BitConverter.ToInt16(src, offset + 8) / 32768f * gain,
+                BitConverter.ToInt16(src, offset + 10) / 32768f * gain,
+                out left, out right);
+            int il = ChannelIndex(fmt.ChannelMask, 0x1, fmt.Channels);
+            int ir = ChannelIndex(fmt.ChannelMask, 0x2, fmt.Channels);
+            if (il >= 0) dst[frameIndex * fmt.Channels + il] = left;
+            if (ir >= 0) dst[frameIndex * fmt.Channels + ir] = right;
+            return;
+        }
+        for (int c = 0; c < 6; c++)
+        {
+            if (map[c] < 0 || map[c] >= fmt.Channels) continue;
+            short sample = BitConverter.ToInt16(src, offset + c * 2);
+            dst[frameIndex * fmt.Channels + map[c]] = sample / 32768f * gain;
+        }
+    }
+
+    private static bool IsTransient(Exception ex)
+    {
+        string message = ex == null ? "" : ex.Message;
+        return message.IndexOf("device changed", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private static bool SameEndpoint(string openedId)
+    {
+        IMMDevice dev = null;
+        try
+        {
+            dev = PickDevice(OutputPreference == "speakers51");
+            return string.Equals(ReadId(dev), openedId ?? "", StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
+        finally { if (dev != null) Marshal.ReleaseComObject(dev); }
+    }
+
+    private static string ReadId(IMMDevice dev)
+    {
+        string id;
+        if (dev.GetId(out id) != 0 || id == null) return "";
+        return id;
+    }
+
+    private static bool QuerySpatial(IMMDevice dev)
+    {
+        ISpatialAudioClient client = null;
+        try
+        {
+            client = ActivateSpatial(dev);
+            Guid streamId = new Guid("BAB5F473-B423-477B-85F5-B5A332A04153");
+            int hr = client.IsSpatialAudioStreamAvailable(ref streamId, IntPtr.Zero);
+            Log("spatial available hr=0x" + hr.ToString("X8"));
+            return hr == 0;
+        }
+        catch (Exception ex)
+        {
+            Log("spatial probe " + ex.Message);
+            return false;
+        }
+        finally { if (client != null) Marshal.ReleaseComObject(client); }
+    }
+
+    private static string ReadSpatialEngine(IMMDevice dev)
+    {
+        IPropertyStore store;
+        if (dev.OpenPropertyStore(0, out store) != 0) return "";
+        try
+        {
+            int count;
+            if (store.GetCount(out count) != 0) return "";
+            string best = "";
+            int bestScore = 0;
+            if (count > 80) count = 80;
+            for (int i = 0; i < count; i++)
+            {
+                PropertyKey key;
+                if (store.GetAt(i, out key) != 0) continue;
+                if (key.fmtid == new Guid("a45c254e-df1c-4efd-8020-67d146a850e0") && key.pid == 14) continue;
+                PropVariant value;
+                if (store.GetValue(ref key, out value) != 0) continue;
+                try
+                {
+                    string text = null;
+                    if (value.vt == 31 && value.p != IntPtr.Zero) text = Marshal.PtrToStringUni(value.p);
+                    else if (value.vt == 8 && value.p != IntPtr.Zero) text = Marshal.PtrToStringBSTR(value.p);
+                    if (string.IsNullOrEmpty(text) || text.Length > 160) continue;
+                    int score = SpatialScore(text);
+                    if (score > bestScore)
+                    {
+                        bestScore = score;
+                        best = text;
+                    }
+                }
+                finally { value.Clear(); }
+            }
+            return best;
+        }
+        finally { Marshal.ReleaseComObject(store); }
+    }
+
+    private static int SpatialScore(string text)
+    {
+        string lower = text.ToLowerInvariant();
+        if (lower.IndexOf("dolby") >= 0) return 4;
+        if (lower.IndexOf("dts") >= 0) return 3;
+        if (lower.IndexOf("sonic") >= 0) return 2;
+        if (lower.IndexOf("spatial") >= 0) return 1;
+        return 0;
+    }
+
+    private static uint[] ChooseBed(uint native)
+    {
+        uint frontLeft = 1u << 1;
+        uint frontRight = 1u << 2;
+        uint frontCenter = 1u << 3;
+        uint low = 1u << 4;
+        uint sideLeft = 1u << 5;
+        uint sideRight = 1u << 6;
+        uint backLeft = 1u << 7;
+        uint backRight = 1u << 8;
+        if ((native & frontLeft) == 0 || (native & frontRight) == 0) return null;
+        uint left = (native & sideLeft) != 0 ? sideLeft : ((native & backLeft) != 0 ? backLeft : 0);
+        uint right = (native & sideRight) != 0 ? sideRight : ((native & backRight) != 0 ? backRight : 0);
+        uint center = (native & frontCenter) != 0 ? frontCenter : 0;
+        uint lfe = (native & low) != 0 ? low : 0;
+        if (left == 0 || right == 0 || center == 0 || lfe == 0) return null;
+        return new uint[] { frontLeft, frontRight, center, lfe, left, right };
+    }
+
+    private static void PlaySpatial(string path, double stopAt)
+    {
+        int generation = OutputGeneration;
+        FileStream fs = null;
+        IMMDevice dev = null;
+        ISpatialAudioClient client = null;
+        ISpatialAudioObjectRenderStream stream = null;
+        ISpatialAudioObject[] objects = new ISpatialAudioObject[6];
+        IntPtr fmtPtr = IntPtr.Zero;
+        IntPtr actPtr = IntPtr.Zero;
+        IntPtr evt = IntPtr.Zero;
+        try
+        {
+            fs = new FileStream(path, FileMode.Open, FileAccess.Read, (FileShare)7);
+            var header = new byte[44];
+            if (fs.Read(header, 0, 44) != 44) throw new InvalidDataException("short wav");
+            int channels = BitConverter.ToInt16(header, 22);
+            int rate = BitConverter.ToInt32(header, 24);
+            if (channels != 6) throw new InvalidOperationException("wav has " + channels + " channels");
+            if (rate != 48000) throw new InvalidOperationException("spatial path expects 48000 Hz");
+            SampleRate = rate;
+            dev = PickDevice(false);
+            DeviceName = ReadName(dev);
+            string openedId = ReadId(dev);
+            client = ActivateSpatial(dev);
+            Guid streamId = new Guid("BAB5F473-B423-477B-85F5-B5A332A04153");
+            int available = client.IsSpatialAudioStreamAvailable(ref streamId, IntPtr.Zero);
+            if (available != 0) throw new InvalidOperationException("spatial stream is not available (0x" + available.ToString("X8") + ")");
+            uint native;
+            Marshal.ThrowExceptionForHR(client.GetNativeStaticObjectTypeMask(out native));
+            uint[] types = ChooseBed(native);
+            if (types == null) throw new InvalidOperationException("the spatial engine has no 5.1 static bed");
+            var wave = new PcmWave();
+            wave.Tag = 3;
+            wave.Channels = 1;
+            wave.Rate = 48000;
+            wave.Avg = 192000;
+            wave.Align = 4;
+            wave.Bits = 32;
+            fmtPtr = Marshal.AllocCoTaskMem(Marshal.SizeOf(typeof(PcmWave)));
+            Marshal.StructureToPtr(wave, fmtPtr, false);
+            int supported = client.IsAudioObjectFormatSupported(fmtPtr);
+            if (supported != 0) throw new InvalidOperationException("spatial engine rejected 48 kHz float objects (0x" + supported.ToString("X8") + ")");
+            evt = CreateEvent(IntPtr.Zero, false, false, null);
+            if (evt == IntPtr.Zero) throw new InvalidOperationException("could not create a spatial audio event");
+            var act = new SpatialActivation();
+            act.ObjectFormat = fmtPtr;
+            act.StaticMask = types[0] | types[1] | types[2] | types[3] | types[4] | types[5];
+            act.Category = 11;
+            act.EventHandle = evt;
+            int actSize = Marshal.SizeOf(typeof(SpatialActivation));
+            actPtr = Marshal.AllocCoTaskMem(actSize);
+            Marshal.StructureToPtr(act, actPtr, false);
+            var blob = new PropVariantBlob();
+            blob.vt = 65;
+            blob.size = actSize;
+            blob.data = actPtr;
+            IntPtr streamPtr;
+            int hr = client.ActivateSpatialAudioStream(ref blob, ref streamId, out streamPtr);
+            if (hr != 0 || streamPtr == IntPtr.Zero) throw new InvalidOperationException("ActivateSpatialAudioStream failed (0x" + hr.ToString("X8") + ")");
+            stream = (ISpatialAudioObjectRenderStream)Marshal.GetObjectForIUnknown(streamPtr);
+            Marshal.Release(streamPtr);
+            for (int c = 0; c < 6; c++)
+            {
+                IntPtr obj;
+                hr = stream.ActivateSpatialAudioObject(types[c], out obj);
+                if (hr != 0 || obj == IntPtr.Zero) throw new InvalidOperationException("static bed object failed (0x" + hr.ToString("X8") + ")");
+                objects[c] = (ISpatialAudioObject)Marshal.GetObjectForIUnknown(obj);
+                Marshal.Release(obj);
+                objects[c].SetVolume(1f);
+            }
+            Marshal.ThrowExceptionForHR(stream.Start());
+            Rendering = "spatial-bed";
+            RenderChannels = 6;
+            if (State == "unavailable")
+            {
+                State = "active";
+                Detail = PlayingDetail(true);
+            }
+            Publish();
+            int lastDeviceTick = Environment.TickCount;
+            while (Running && WavPath == path && !PlayTones && OutputGeneration == generation)
+            {
+                uint waited = WaitForSingleObject(evt, 50);
+                if (unchecked(Environment.TickCount - lastDeviceTick) > 1000)
+                {
+                    lastDeviceTick = Environment.TickCount;
+                    if (!SameEndpoint(openedId)) throw new InvalidOperationException("device changed");
+                }
+                Clock clock;
+                lock (Gate) clock = ClockNow;
+                if (stopAt > 0 && clock.MediaSeconds() >= stopAt) break;
+                if (waited != 0) continue;
+                uint dynamicCount, frameCount;
+                hr = stream.BeginUpdatingAudioObjects(out dynamicCount, out frameCount);
+                if (hr == unchecked((int)0x88890101)) continue;
+                if (hr == unchecked((int)0x88890100) || hr == unchecked((int)0x88890102)) throw new InvalidOperationException("device changed");
+                if (hr != 0) throw new InvalidOperationException("spatial update failed (0x" + hr.ToString("X8") + ")");
+                try
+                {
+                    int count = (int)frameCount;
+                    if (count < 0) count = 0;
+                    if (count > 48000) count = 48000;
+                    byte[] block = new byte[count * 12];
+                    int gotFrames = 0;
+                    if (!clock.Paused && count > 0)
+                    {
+                        double step = clock.Rate <= 0 ? 1 : clock.Rate;
+                        double origin = (clock.MediaSeconds() + 0.02) * rate;
+                        if (fs == null) fs = OpenGrowing(path);
+                        if (fs != null && Math.Abs(step - 1.0) < 0.001)
+                        {
+                            long idx = (long)origin;
+                            if (idx >= 0)
+                            {
+                                int got = 0;
+                                try
+                                {
+                                    fs.Position = 44L + idx * 12;
+                                    got = fs.Read(block, 0, block.Length);
+                                }
+                                catch (IOException) { got = 0; }
+                                catch (ArgumentException) { got = 0; }
+                                gotFrames = got / 12;
+                                if (got < block.Length)
+                                {
+                                    fs.Dispose();
+                                    fs = null;
+                                    if (gotFrames == 0) Thread.Sleep(20);
+                                }
+                            }
+                        }
+                        else if (fs != null)
+                        {
+                            for (int i = 0; i < count; i++)
+                            {
+                                long idx = (long)(origin + i * step);
+                                if (idx < 0) continue;
+                                try
+                                {
+                                    fs.Position = 44L + idx * 12;
+                                    if (fs.Read(block, i * 12, 12) != 12) { fs.Dispose(); fs = null; break; }
+                                    gotFrames = i + 1;
+                                }
+                                catch (IOException) { break; }
+                                catch (ArgumentException) { break; }
+                            }
+                        }
+                    }
+                    float gain = OutputMilli / 1000f;
+                    for (int c = 0; c < 6; c++)
+                    {
+                        if (objects[c] == null) continue;
+                        IntPtr buffer;
+                        uint length;
+                        if (objects[c].GetBuffer(out buffer, out length) != 0 || buffer == IntPtr.Zero) continue;
+                        int samples = (int)(length / 4);
+                        if (samples > count) samples = count;
+                        if (samples <= 0) continue;
+                        float[] mono = new float[samples];
+                        for (int i = 0; i < samples && i < gotFrames; i++)
+                        {
+                            short sample = BitConverter.ToInt16(block, i * 12 + c * 2);
+                            mono[i] = sample / 32768f * gain;
+                        }
+                        Marshal.Copy(mono, 0, buffer, samples);
+                    }
+                }
+                finally { stream.EndUpdatingAudioObjects(); }
+            }
+            try { stream.Stop(); } catch { }
+        }
+        finally
+        {
+            if (fs != null) fs.Dispose();
+            for (int i = 0; i < objects.Length; i++) if (objects[i] != null) Marshal.ReleaseComObject(objects[i]);
+            if (stream != null) Marshal.ReleaseComObject(stream);
+            if (client != null) Marshal.ReleaseComObject(client);
+            if (dev != null) Marshal.ReleaseComObject(dev);
+            if (fmtPtr != IntPtr.Zero) Marshal.FreeCoTaskMem(fmtPtr);
+            if (actPtr != IntPtr.Zero) Marshal.FreeCoTaskMem(actPtr);
+            if (evt != IntPtr.Zero) CloseHandle(evt);
+        }
+    }
+
+    private static FileStream OpenGrowing(string path)
+    {
+        try { return new FileStream(path, FileMode.Open, FileAccess.Read, (FileShare)7); }
+        catch { return null; }
+    }
+
+    private static ISpatialAudioClient ActivateSpatial(IMMDevice dev)
+    {
+        Guid iid = typeof(ISpatialAudioClient).GUID;
+        IntPtr p;
+        int hr = dev.Activate(ref iid, 23, IntPtr.Zero, out p);
+        if (hr != 0 || p == IntPtr.Zero) throw new InvalidOperationException("Spatial Audio is not available on this device (0x" + hr.ToString("X8") + ")");
+        var client = (ISpatialAudioClient)Marshal.GetObjectForIUnknown(p);
+        Marshal.Release(p);
+        return client;
     }
 
     private static string Tool(string file, string env)
@@ -848,19 +1469,22 @@ internal static class Host
         return -1;
     }
 
-    private static IMMDevice PickDevice()
+    private static IMMDevice PickDevice(bool preferSix)
     {
         IMMDeviceEnumerator en = (IMMDeviceEnumerator)new MMDeviceEnumeratorCom();
-        IMMDeviceCollection all = en.EnumAudioEndpoints(0, 1);
-        int count = all.GetCount();
         IMMDevice chosen = null;
-        for (int i = 0; i < count; i++)
+        if (preferSix)
         {
-            IMMDevice d = all.Item(i);
-            if (chosen == null && MixChannels(d) >= 6) chosen = d;
-            else Marshal.ReleaseComObject(d);
+            IMMDeviceCollection all = en.EnumAudioEndpoints(0, 1);
+            int count = all.GetCount();
+            for (int i = 0; i < count; i++)
+            {
+                IMMDevice d = all.Item(i);
+                if (chosen == null && MixChannels(d) >= 6) chosen = d;
+                else Marshal.ReleaseComObject(d);
+            }
+            Marshal.ReleaseComObject(all);
         }
-        Marshal.ReleaseComObject(all);
         if (chosen == null) chosen = en.GetDefaultAudioEndpoint(0, 1);
         Marshal.ReleaseComObject(en);
         return chosen;
@@ -876,12 +1500,17 @@ internal static class Host
 
     private static int MixChannels(IMMDevice dev)
     {
+        return ReadMix(dev).Channels;
+    }
+
+    private static WaveFormat ReadMix(IMMDevice dev)
+    {
         IAudioClient client = Activate(dev);
         IntPtr mix = IntPtr.Zero;
         try
         {
             Marshal.ThrowExceptionForHR(client.GetMixFormat(out mix));
-            return WaveFormat.Read(mix).Channels;
+            return WaveFormat.Read(mix);
         }
         finally
         {
@@ -984,6 +1613,10 @@ internal static class Host
 
     [DllImport("ole32.dll")] private static extern int CoInitializeEx(IntPtr reserved, uint coinit);
     [DllImport("ole32.dll")] private static extern int PropVariantClear(ref PropVariant pvar);
+    [DllImport("ole32.dll")] private static extern void CoTaskMemFree(IntPtr ptr);
+    [DllImport("kernel32.dll")] private static extern IntPtr CreateEvent(IntPtr attrs, bool manual, bool initial, string name);
+    [DllImport("kernel32.dll")] private static extern bool CloseHandle(IntPtr handle);
+    [DllImport("kernel32.dll")] private static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
 
     private struct WaveFormat
     {
@@ -1071,5 +1704,68 @@ internal static class Host
         [FieldOffset(8)] public IntPtr p;
         public string GetString() { return vt == 31 && p != IntPtr.Zero ? Marshal.PtrToStringUni(p) : null; }
         public void Clear() { PropVariant local = this; PropVariantClear(ref local); this = local; }
+    }
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    private struct PcmWave
+    {
+        public ushort Tag;
+        public ushort Channels;
+        public uint Rate;
+        public uint Avg;
+        public ushort Align;
+        public ushort Bits;
+        public ushort Extra;
+    }
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    private struct SpatialActivation
+    {
+        public IntPtr ObjectFormat;
+        public uint StaticMask;
+        public uint MinDynamic;
+        public uint MaxDynamic;
+        public int Category;
+        public IntPtr EventHandle;
+        public IntPtr NotifyObject;
+    }
+    [StructLayout(LayoutKind.Explicit, Size = 24)]
+    private struct PropVariantBlob
+    {
+        [FieldOffset(0)] public ushort vt;
+        [FieldOffset(8)] public int size;
+        [FieldOffset(16)] public IntPtr data;
+    }
+    [ComImport, Guid("BBF8E066-AAAA-49BE-9A4D-FD2A858EA27F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface ISpatialAudioClient
+    {
+        [PreserveSig] int GetStaticObjectPosition(uint type, out float x, out float y, out float z);
+        [PreserveSig] int GetNativeStaticObjectTypeMask(out uint mask);
+        [PreserveSig] int GetMaxDynamicObjectCount(out uint value);
+        [PreserveSig] int GetSupportedAudioObjectFormatEnumerator(out IntPtr enumerator);
+        [PreserveSig] int GetMaxFrameCount(IntPtr objectFormat, out uint frameCountPerBuffer);
+        [PreserveSig] int IsAudioObjectFormatSupported(IntPtr objectFormat);
+        [PreserveSig] int IsSpatialAudioStreamAvailable(ref Guid streamUuid, IntPtr auxiliaryInfo);
+        [PreserveSig] int ActivateSpatialAudioStream(ref PropVariantBlob activationParams, ref Guid riid, out IntPtr stream);
+    }
+    [ComImport, Guid("BAB5F473-B423-477B-85F5-B5A332A04153"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface ISpatialAudioObjectRenderStream
+    {
+        [PreserveSig] int GetAvailableDynamicObjectCount(out uint value);
+        [PreserveSig] int GetService(ref Guid riid, out IntPtr service);
+        [PreserveSig] int Start();
+        [PreserveSig] int Stop();
+        [PreserveSig] int Reset();
+        [PreserveSig] int BeginUpdatingAudioObjects(out uint availableDynamicObjectCount, out uint frameCountPerBuffer);
+        [PreserveSig] int EndUpdatingAudioObjects();
+        [PreserveSig] int ActivateSpatialAudioObject(uint type, out IntPtr audioObject);
+    }
+    [ComImport, Guid("DDE28967-521B-46E5-8F00-BD6F2BC8AB1D"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface ISpatialAudioObject
+    {
+        [PreserveSig] int GetBuffer(out IntPtr buffer, out uint bufferLength);
+        [PreserveSig] int SetEndOfStream(uint frameCount);
+        [PreserveSig] int IsActive(out int isActive);
+        [PreserveSig] int GetAudioObjectType(out uint audioObjectType);
+        [PreserveSig] int SetPosition(float x, float y, float z);
+        [PreserveSig] int SetVolume(float volume);
     }
 }

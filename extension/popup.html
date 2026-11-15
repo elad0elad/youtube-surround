@@ -20,10 +20,22 @@
     <button id="automatic" class="mode on" type="button">Automatic</button>
     <button id="manual" class="mode" type="button">Manual</button>
   </section>
+  <label class="output">
+    Output
+    <select id="output">
+      <option value="auto">Auto Detect</option>
+      <option value="speakers51">5.1 Speakers</option>
+      <option value="atmos">Dolby Atmos Headphones</option>
+      <option value="surroundHeadphones">Surround Headphones</option>
+      <option value="stereo">Stereo Headphones</option>
+    </select>
+  </label>
+  <p id="route"></p>
+  <p id="outputError"></p>
   <section class="actions">
     <button id="start" type="button">Play Surround</button>
     <button id="stop" type="button">Stereo</button>
-    <button id="tones" type="button">Test speakers</button>
+    <button id="tones" type="button">Test Audio</button>
   </section>
   <p id="detail"></p>
   <details>

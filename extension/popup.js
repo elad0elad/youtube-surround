@@ -10,7 +10,11 @@ const fields = [
   ["bufferSeconds", "Buffer"],
   ["latencyMs", "Audio latency"],
   ["decoder", "Decoder"],
-  ["device", "Output device"]
+  ["device", "Output device"],
+  ["outputPath", "Output path"],
+  ["rendering", "Rendering"],
+  ["renderChannels", "Render channels"],
+  ["spatialEngine", "Spatial engine"]
 ];
 
 const stateLabels = {
@@ -25,11 +29,26 @@ const stateLabels = {
   buffering: "Buffering"
 };
 
+const pathLabels = {
+  "discrete-5.1": "Direct 5.1",
+  "spatial-bed": "Spatial 5.1 bed",
+  "stereo-downmix": "Stereo downmix"
+};
+
 function render(status) {
-  document.getElementById("state").textContent = stateLabels[status.state] || status.state || "Waiting";
+  const activeLabel = pathLabels[status.outputPath] || "Playing";
+  document.getElementById("state").textContent = status.state === "active" ? activeLabel : (stateLabels[status.state] || status.state || "Waiting");
   document.getElementById("enabled").checked = status.enabled !== false;
   document.getElementById("automatic").classList.toggle("on", status.mode !== "manual");
   document.getElementById("manual").classList.toggle("on", status.mode === "manual");
+  const output = document.getElementById("output");
+  if (document.activeElement !== output) output.value = status.output || status.outputMode || "auto";
+  const route = [];
+  if (status.device) route.push(status.device);
+  if (status.renderChannels) route.push(status.renderChannels + " ch");
+  if (status.outputPath === "spatial-bed") route.push(status.spatialEngine || "Windows Spatial Audio");
+  document.getElementById("route").textContent = route.join(" · ");
+  document.getElementById("outputError").textContent = status.outputError || "";
   document.getElementById("detail").textContent = status.detail || "";
   const dl = document.getElementById("advanced");
   dl.replaceChildren();
@@ -59,6 +78,9 @@ document.getElementById("automatic").addEventListener("click", () => {
 });
 document.getElementById("manual").addEventListener("click", () => {
   send({ type: "setPrefs", mode: "manual" });
+});
+document.getElementById("output").addEventListener("change", (event) => {
+  send({ type: "setPrefs", output: event.target.value });
 });
 document.getElementById("start").addEventListener("click", async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });

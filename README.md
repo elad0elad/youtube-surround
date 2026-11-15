@@ -1,121 +1,123 @@
 # YouTube Surround
 
-Copyright © 2026 elad0elad. Open source under the [MIT License](LICENSE). The extension developer name is elad0elad.
+Copyright © 2026 elad0elad. Open source under the [MIT License](LICENSE).
 
-YouTube Surround plays a real IAMF surround stream from YouTube as six discrete channels on Windows: front left, front right, center, LFE, surround left, surround right. If a video has no IAMF stream, YouTube's normal stereo keeps playing. The extension does not upmix stereo and does not copy channels to imitate 5.1.
+YouTube Surround plays a real IAMF stream from YouTube on Windows. The extension does not upmix a stereo video and does not copy channels to imitate surround. A video without an IAMF stream keeps YouTube's own stereo.
 
-The browser alone does not deliver those six channels. A small Windows program next to the extension downloads the IAMF audio, decodes it, and plays it through WASAPI on a device whose shared format is already 5.1.
+The picture stays in the browser. A small program next to the extension downloads the IAMF audio, decodes it, and plays it. Playback starts after the first seconds. The rest of a long video keeps downloading in the background.
 
-## Requirements
+## Output
 
-- Windows 10 or 11.
-- Brave or Chrome.
-- Windows sound set to a 5.1 speaker configuration. The shared format of the output device must already be six channels. Headphones and stereo endpoints stay stereo. The extension will say surround is unavailable and leave YouTube's audio alone.
-- The speakers must be wired front left, front right, center, subwoofer, surround left, surround right.
+Choose the output in the extension popup. The choice is saved.
+
+| Choice | What plays |
+| --- | --- |
+| Auto Detect | The default Windows device is measured. Six channels use direct 5.1. Otherwise an active Windows Spatial Audio stream gets a 5.1 bed. Otherwise the audio is downmixed to stereo. |
+| 5.1 Speakers | Six discrete channels: front left, front right, center, LFE, surround left, surround right. |
+| Dolby Atmos Headphones | A 5.1 channel bed through Windows Spatial Audio, only when that stream actually opens. This is not object-based Dolby Atmos. |
+| Surround Headphones | Direct multichannel audio when the Windows device is already accepting six channels. |
+| Stereo Headphones | A downmix that keeps the center, the surrounds, and the LFE. |
+
+The popup shows the route that is actually playing, the device name, and a plain error when the selected mode cannot be opened. Test Audio plays one tone on each channel.
+
+Direct 5.1 needs a shared format that is already six channels. The speaker order is front left, front right, center, subwoofer, surround left, surround right.
 
 ## Download
 
-The current Windows installer is [YouTube Surround 1.1.0](https://github.com/elad0elad/youtube-surround/releases/tag/v1.1.0). Run `YouTube.Surround.Setup.exe`. The guide opens when installation finishes.
+The current Windows installer is [YouTube Surround 1.2.0](https://github.com/elad0elad/youtube-surround/releases/tag/v1.2.0). Run `YouTube.Surround.Setup.exe`. The guide opens when installation finishes.
 
-## Install
+## Install from source
 
-From a source checkout:
-
-1. Run `installer\install.cmd`. It copies the host, the decoder, yt-dlp, and Deno into `%LOCALAPPDATA%\YouTubeSurround`, and registers the native-messaging host for Chrome and Brave.
+1. Run `installer\install.cmd`. It copies the program into `%LOCALAPPDATA%\YouTubeSurround` and registers it for Chrome and Brave.
 2. Open `brave://extensions` or `chrome://extensions`.
 3. Turn on Developer mode.
 4. Choose **Load unpacked** and select `%LOCALAPPDATA%\YouTubeSurround\extension`.
-5. Open YouTube and play a video that actually offers IAMF audio. The first one used here is `https://www.youtube.com/watch?v=iMrnS6finbA`.
+5. Reload the YouTube tab.
 
-No Python install and no manual registry edit are required. Deno is included because current yt-dlp needs a JavaScript runtime to read YouTube.
+Deno is included because yt-dlp needs a JavaScript runtime to read YouTube.
+
+## Use
+
+- **Automatic** checks each video. **Manual** waits for **Play Surround**.
+- **Stereo** stops the external player and returns YouTube's audio.
+- YouTube's mute button and volume slider also control the external player.
+- While the external player is covering the current position, YouTube's stereo is silent. Ads, a seek past the downloaded audio, and any failure return that stereo. The video is not stopped.
 
 ## Remove
 
-Run `installer\uninstall.cmd`. Then remove **YouTube Surround** from the browser's extensions page.
-
-## How to use it
-
-The popup has two modes.
-
-- **Automatic.** Each video is checked. IAMF audio is played as 5.1. Anything else stays stereo.
-- **Manual.** Nothing starts until **Play Surround**. **Stereo** stops the six-channel playback and restores YouTube's audio.
-
-**Test speakers** plays a different tone on each speaker for about eight seconds: front left 220 Hz, front right 277 Hz, center 330 Hz, LFE 55 Hz, surround left 440 Hz, surround right 554 Hz.
-
-Advanced information shows only values the host has measured: video id, codec, format, mix, output channel count, layout, sample rate, buffered audio length, device latency reported by WASAPI, decoder, and device name.
-
-While 5.1 is actually playing, the original YouTube stereo track is muted. Ads and any failure return to that stereo track. A surround failure does not stop the video.
+Run `installer\uninstall.cmd`, then remove YouTube Surround from the browser's extensions page.
 
 ## Limits
 
-- Not every video has an IAMF stream. The Samsung TV client is the path that currently exposes format 773. YouTube can change or remove it.
-- Playback starts as soon as the first seconds of 5.1 audio are decoded. The rest of a long video keeps downloading in the background. Seeking past the downloaded part plays YouTube's stereo until the surround audio catches up.
-- Two YouTube tabs do not share one clock. The visible tab owns the surround playback.
-- This build is installed for the current Windows user. It is not a Chrome Web Store package.
+- Not every video has an IAMF stream. YouTube can change or remove it.
+- Seeking past the downloaded part plays YouTube's stereo until the external audio catches up.
+- The spatial mode sends a 5.1 bed. It does not send Dolby Atmos objects, and it opens only when Windows Spatial Audio accepts the stream.
+- One visible YouTube tab owns the clock.
+- This is a per-user Windows install, not a Chrome Web Store package.
 
-## Build from source
+## Build
 
-The Windows setup file is only a package of this source. To build it yourself:
-
-1. Install Rust with the `x86_64-pc-windows-gnu` toolchain, a static libopus, and set `OPUS_LIB_DIR` to that library with `OPUS_STATIC=1`.
-2. Clone [iamf-rs](https://github.com/baylesj/iamf-rs) at commit `6527afa88918cf82ccc39d7b1399d893199d645c` into `third_party/iamf-rs`. It stays under its own BSD-3-Clause-Clear license.
-3. From `decoder/ys-iamf`, run `cargo build --release`. The result is `ys-iamf.exe`.
+1. Install Rust with the `x86_64-pc-windows-gnu` toolchain and a static libopus. Set `OPUS_LIB_DIR` and `OPUS_STATIC=1`.
+2. Clone [iamf-rs](https://github.com/baylesj/iamf-rs) at commit `6527afa88918cf82ccc39d7b1399d893199d645c` into `third_party/iamf-rs`. It remains under its own BSD-3-Clause-Clear license.
+3. From `decoder/ys-iamf`, run `cargo build --release`.
 4. Compile `native/host/Host.cs` with the .NET Framework C# compiler, referencing `System.Web.Extensions.dll`.
-5. Place `yt-dlp.exe` (Unlicense) and `deno.exe` (MIT) next to `installer/install.ps1`, then run `installer/install.cmd`.
+5. Place `yt-dlp.exe` and `deno.exe` next to `installer/install.ps1`, then run `installer/install.cmd`.
 
-libopus is BSD licensed. Those third-party pieces are not part of the elad0elad copyright.
+libopus is BSD licensed. yt-dlp is Unlicense. Deno is MIT. Those pieces are not part of the elad0elad copyright.
 
-## If it does not play in 5.1
+## If the sound is wrong
 
-- Confirm Windows is using the 5.1 speakers, not headphones or a stereo default device.
-- Use **Test speakers**. Each tone must come from one speaker only.
-- A video with no IAMF source stays on **Stereo source**. That is the correct result.
-- If the badge says the Windows component is missing, run `installer\install.cmd` again and reload the extension.
-- The host writes `%LOCALAPPDATA%\YouTubeSurround\host.log`.
+- Reload the YouTube tab after loading the extension.
+- For speakers, choose **5.1 Speakers** and run **Test Audio**. A tone from the wrong speaker means the Windows wiring does not match.
+- A video with no IAMF source stays on **Stereo source**.
+- If the popup says the Windows component is missing, run `installer\install.cmd` again.
+- The program writes `%LOCALAPPDATA%\YouTubeSurround\host.log`.
 
 ---
 
 # YouTube Surround — עברית
 
-זכויות יוצרים © 2026 elad0elad. קוד פתוח ברישיון MIT. שם המפתח של ההרחבה הוא elad0elad.
+זכויות יוצרים © 2026 elad0elad. קוד פתוח ברישיון MIT.
 
-YouTube Surround משמיע זרם IAMF אמיתי מ־YouTube כשישה ערוצים נפרדים ב־Windows: קדמי שמאל, קדמי ימין, מרכז, סאב, סראונד שמאל וסראונד ימין. אם לסרטון אין זרם IAMF, נשאר הסטריאו הרגיל של YouTube. אין המרה מסטריאו ל־5.1 ואין שכפול ערוצים.
+YouTube Surround משמיע זרם IAMF אמיתי מ־YouTube ב־Windows. אין המרה מסטריאו לסראונד ואין שכפול ערוצים. סרטון בלי IAMF נשאר בסטריאו המקורי של YouTube.
 
-הדפדפן לבדו לא מוציא כאן שישה ערוצים. תוכנית Windows קטנה מורידה את אודיו ה־IAMF, מפענחת אותו, ומשמיעה אותו דרך WASAPI בהתקן שכבר מוגדר ל־5.1.
+התמונה נשארת בדפדפן. תוכנית קטנה מורידה את האודיו, מפענחת אותו, ומשמיעה אותו. הניגון מתחיל אחרי השניות הראשונות, והמשך של סרטון ארוך יורד בזמן הצפייה.
+
+## פלט
+
+את סוג הפלט בוחרים מחלון התוסף. הבחירה נשמרת.
+
+| בחירה | מה מתנגן |
+| --- | --- |
+| Auto Detect | נבדק התקן ברירת המחדל. שישה ערוצים יוצאים כ־5.1 ישיר. אם Spatial Audio פעיל, נשלחת מיטת 5.1. אחרת מתנגן דאוןמיקס לסטריאו. |
+| 5.1 Speakers | שישה ערוצים נפרדים: קדמי שמאל, קדמי ימין, מרכז, סאב, סראונד שמאל, סראונד ימין. |
+| Dolby Atmos Headphones | מיטת 5.1 דרך Spatial Audio של Windows, רק כשהזרם באמת נפתח. זה לא Dolby Atmos מבוסס אובייקטים. |
+| Surround Headphones | פלט רב־ערוצי כשההתקן של Windows כבר מקבל שישה ערוצים. |
+| Stereo Headphones | דאוןמיקס ששומר על המרכז, הסראונד והסאב. |
+
+בחלון מופיעים המסלול שבאמת פעיל, שם ההתקן, והודעה ברורה אם המצב שנבחר לא נפתח. Test Audio משמיע צליל אחד בכל ערוץ.
+
+5.1 ישיר דורש פורמט משותף של שישה ערוצים. סדר הרמקולים: קדמי שמאל, קדמי ימין, מרכז, סאב, סראונד שמאל, סראונד ימין.
 
 ## הורדה
 
-קובץ ההתקנה ל־Windows נמצא בשחרור [YouTube Surround 1.1.0](https://github.com/elad0elad/youtube-surround/releases/tag/v1.1.0). מריצים את `YouTube.Surround.Setup.exe`. בסיום נפתח דף ההפעלה. הניגון מתחיל אחרי השניות הראשונות, והמשך הקובץ יורד ברקע.
+קובץ ההתקנה נמצא בשחרור [YouTube Surround 1.2.0](https://github.com/elad0elad/youtube-surround/releases/tag/v1.2.0). מריצים את `YouTube.Surround.Setup.exe`. בסיום נפתחות ההוראות.
 
-## התקנה
+## התקנה מקוד המקור
 
-מתוך קוד המקור:
-
-1. מריצים את `installer\install.cmd`. הקבצים עוברים אל `%LOCALAPPDATA%\YouTubeSurround`, והרישום ל־Chrome ול־Brave נכתב אוטומטית.
-2. פותחים `brave://extensions` או `chrome://extensions`.
+1. מריצים את `installer\install.cmd`.
+2. פותחים את `brave://extensions` או `chrome://extensions`.
 3. מפעילים מצב מפתח.
-4. בוחרים **טעינה ללא אריזה** ואת התיקייה `%LOCALAPPDATA%\YouTubeSurround\extension`.
-5. פותחים סרטון YouTube שבאמת מציע IAMF. הסרטון שנבדק: `https://www.youtube.com/watch?v=iMrnS6finbA`.
-
-אין צורך להתקין Python ואין צורך לערוך את הרישום ביד. Deno כלול כי yt-dlp צריך מנוע JavaScript כדי לקרוא את YouTube.
-
-## הסרה
-
-מריצים את `installer\uninstall.cmd`, ואז מסירים את **YouTube Surround** מדף התוספים.
+4. בוחרים **טעינה ללא אריזה** ואת `%LOCALAPPDATA%\YouTubeSurround\extension`.
+5. מרעננים את הלשונית של YouTube.
 
 ## שימוש
 
-- **Automatic:** כל סרטון נבדק. אם יש IAMF, מתנגן 5.1. אחרת נשאר סטריאו.
-- **Manual:** כלום לא מתחיל עד **Play Surround**. **Stereo** עוצר את ששת הערוצים ומחזיר את השמע של YouTube.
+- **Automatic** בודק כל סרטון. **Manual** מחכה ל־**Play Surround**.
+- **Stereo** עוצר את הנגן החיצוני ומחזיר את השמע של YouTube.
+- כפתור ההשתקה והמחוון של YouTube שולטים גם בנגן החיצוני.
+- בזמן שהנגן החיצוני מכסה את מיקום הניגון, הסטריאו של YouTube שקט. פרסומת, קפיצה מעבר לחלק שירד, או כשל מחזירים את הסטריאו. הסרטון לא נעצר.
 
-**Test speakers** משמיע צליל אחר בכל רמקול: 220, 277, 330, 55, 440 ו־554 הרץ.
+## הסרה
 
-בזמן ש־5.1 באמת מתנגן, הסטריאו המקורי של YouTube מושתק. פרסומת או כשל מחזירים את הסטריאו. כשל ב־Surround לא עוצר את הסרטון.
-
-## דרישות שמע
-
-Windows צריך להיות מוגדר לרמקולים ב־5.1. אוזניות והתקן סטריאו נשארים סטריאו, והתוסף יציג שאין Surround זמין. סדר החיבור: קדמי שמאל, קדמי ימין, מרכז, סאב, סראונד שמאל, סראונד ימין.
-
-## מה עדיין לא נבדק עד הסוף
-
-לא רצה בדיקת יציבות של שעה. הפרסום בחנות של Chrome דורש חשבון מפתח. סנכרון השפתיים נבדק מול שעון הסרטון, לא בהקלטה של החדר.
+מריצים את `installer\uninstall.cmd`, ואז מסירים את YouTube Surround מדף התוספים.

@@ -5,7 +5,7 @@
   color: #f3f0e8;
 }
 body {
-  width: 320px;
+  width: 360px;
   margin: 0;
   padding: 16px;
 }
@@ -36,6 +36,33 @@ h1 {
   display: flex;
   gap: 8px;
   margin-top: 14px;
+}
+.output {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+  font-size: 12px;
+  color: #b7b2a8;
+}
+select {
+  background: #1d232d;
+  color: inherit;
+  border: 1px solid #343b48;
+  border-radius: 8px;
+  padding: 8px;
+}
+#route {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #d7c7a1;
+}
+#outputError {
+  margin: 4px 0 0;
+  min-height: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #e0a090;
 }
 button {
   flex: 1;
