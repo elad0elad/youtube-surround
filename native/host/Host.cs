@@ -1308,8 +1308,7 @@ internal static class Host
             SampleRate = rate;
             dev = PickDevice();
             DeviceName = ReadName(dev);
-            string preferredAtStart;
-            lock (DeviceLock) preferredAtStart = PreferredId;
+            string openedId = ReadId(dev);
             client = ActivateSpatial(dev);
             Guid streamId = new Guid("BAB5F473-B423-477B-85F5-B5A332A04153");
             int available = client.IsSpatialAudioStreamAvailable(ref streamId, IntPtr.Zero);
@@ -1376,91 +1375,81 @@ internal static class Host
             int minFrames = int.MaxValue;
             int maxFrames = 0;
             int badGets = 0;
+            int count = 480;
+            byte[] block = new byte[count * 12];
+            float[][] planes = new float[6][];
+            for (int c = 0; c < 6; c++) planes[c] = new float[count];
+            long cursor = -1;
+            bool primed = false;
+            bool submitPaused = false;
             while (Running && WavPath == path && !PlayTones && OutputGeneration == generation)
             {
+                if (!primed)
+                {
+                    Clock ahead;
+                    lock (Gate) ahead = ClockNow;
+                    double step = ahead.Rate <= 0 ? 1 : ahead.Rate;
+                    double target = (ahead.MediaSeconds() + 0.02) * rate;
+                    if (target < 0) target = 0;
+                    submitPaused = ahead.Paused;
+                    if (ahead.Paused)
+                    {
+                        cursor = (long)target;
+                        for (int c = 0; c < 6; c++) Array.Clear(planes[c], 0, count);
+                    }
+                    else
+                    {
+                        if (cursor < 0 || Math.Abs(step - 1.0) >= 0.001 || Math.Abs(cursor - target) > rate * 0.12)
+                            cursor = (long)target;
+                        ReadSpatialBlock(ref fs, path, cursor, step, count, block, planes, OutputMilli / 1000f);
+                    }
+                    primed = true;
+                }
                 uint waited = WaitForSingleObject(evt, 50);
+                if (waited == 0)
+                {
+                    uint dynamicCount, frameCount;
+                    hr = stream.BeginUpdatingAudioObjects(out dynamicCount, out frameCount);
+                    if (hr == unchecked((int)0x88890101)) { }
+                    else if (hr == unchecked((int)0x88890100) || hr == unchecked((int)0x88890102)) throw new InvalidOperationException("device changed");
+                    else if (hr != 0)
+                    {
+                        internalTries++;
+                        dropouts++;
+                        if (dropouts == 1 || internalTries == 40) Log("spatial begin 0x" + hr.ToString("X8") + " missed=" + dropouts);
+                        if (internalTries >= 40) throw new InvalidOperationException("spatial update failed (0x" + hr.ToString("X8") + ")");
+                    }
+                    else
+                    {
+                        internalTries = 0;
+                        updates++;
+                        if ((int)frameCount < minFrames) minFrames = (int)frameCount;
+                        if ((int)frameCount > maxFrames) maxFrames = (int)frameCount;
+                        try
+                        {
+                            for (int c = 0; c < 6; c++)
+                            {
+                                if (objects[c] == null) continue;
+                                IntPtr buffer;
+                                uint length;
+                                if (objects[c].GetBuffer(out buffer, out length) != 0 || buffer == IntPtr.Zero) { badGets++; continue; }
+                                int samples = (int)(length / 4);
+                                if (samples <= 0) continue;
+                                if (samples > count) samples = count;
+                                Marshal.Copy(planes[c], 0, buffer, samples);
+                            }
+                        }
+                        finally { stream.EndUpdatingAudioObjects(); }
+                        if (!submitPaused && cursor >= 0) cursor += frameCount;
+                        primed = false;
+                    }
+                }
                 string preferredNow;
                 lock (DeviceLock) preferredNow = PreferredId;
-                if (!string.Equals(preferredNow, preferredAtStart, StringComparison.OrdinalIgnoreCase)) return;
+                if (!string.IsNullOrEmpty(preferredNow) && !string.Equals(preferredNow, openedId, StringComparison.OrdinalIgnoreCase)) return;
                 Clock clock;
                 lock (Gate) clock = ClockNow;
                 if (stopAt > 0 && clock.MediaSeconds() >= stopAt) break;
-                if (waited != 0) continue;
-                int count = 480;
-                byte[] block = new byte[count * 12];
-                int gotFrames = 0;
-                if (!clock.Paused)
-                {
-                    double step = clock.Rate <= 0 ? 1 : clock.Rate;
-                    double origin = (clock.MediaSeconds() + 0.02) * rate;
-                    if (fs == null) fs = OpenGrowing(path);
-                    if (fs != null && Math.Abs(step - 1.0) < 0.001)
-                    {
-                        long idx = (long)origin;
-                        if (idx >= 0)
-                        {
-                            int got = 0;
-                            try
-                            {
-                                fs.Position = 44L + idx * 12;
-                                got = fs.Read(block, 0, block.Length);
-                            }
-                            catch (IOException) { got = 0; }
-                            catch (ArgumentException) { got = 0; }
-                            gotFrames = got / 12;
-                            if (got < block.Length)
-                            {
-                                fs.Dispose();
-                                fs = null;
-                            }
-                        }
-                    }
-                }
-                float gain = OutputMilli / 1000f;
-                float[][] planes = new float[6][];
-                for (int c = 0; c < 6; c++)
-                {
-                    float[] mono = new float[count];
-                    int filled = gotFrames;
-                    if (filled > count) filled = count;
-                    for (int i = 0; i < filled; i++)
-                    {
-                        short sample = BitConverter.ToInt16(block, i * 12 + c * 2);
-                        mono[i] = sample / 32768f * gain;
-                    }
-                    planes[c] = mono;
-                }
-                uint dynamicCount, frameCount;
-                hr = stream.BeginUpdatingAudioObjects(out dynamicCount, out frameCount);
-                if (hr == unchecked((int)0x88890101)) continue;
-                if (hr == unchecked((int)0x88890100) || hr == unchecked((int)0x88890102)) throw new InvalidOperationException("device changed");
-                if (hr != 0)
-                {
-                    internalTries++;
-                    dropouts++;
-                    if (dropouts == 1 || internalTries == 40) Log("spatial begin 0x" + hr.ToString("X8") + " missed=" + dropouts);
-                    if (internalTries < 40) continue;
-                    throw new InvalidOperationException("spatial update failed (0x" + hr.ToString("X8") + ")");
-                }
-                internalTries = 0;
-                updates++;
-                if ((int)frameCount < minFrames) minFrames = (int)frameCount;
-                if ((int)frameCount > maxFrames) maxFrames = (int)frameCount;
-                try
-                {
-                    for (int c = 0; c < 6; c++)
-                    {
-                        if (objects[c] == null) continue;
-                        IntPtr buffer;
-                        uint length;
-                        if (objects[c].GetBuffer(out buffer, out length) != 0 || buffer == IntPtr.Zero) { badGets++; continue; }
-                        int samples = (int)(length / 4);
-                        if (samples <= 0) continue;
-                        if (samples > count) samples = count;
-                        Marshal.Copy(planes[c], 0, buffer, samples);
-                    }
-                }
-                finally { stream.EndUpdatingAudioObjects(); }
             }
             Log("spatial updates=" + updates + " missed=" + dropouts + " frames=" + minFrames + "-" + maxFrames + " badGets=" + badGets);
             try { stream.Stop(); } catch { }
@@ -1476,6 +1465,58 @@ internal static class Host
             if (fmtPtr != IntPtr.Zero) Marshal.FreeCoTaskMem(fmtPtr);
             if (actPtr != IntPtr.Zero) Marshal.FreeCoTaskMem(actPtr);
             if (evt != IntPtr.Zero) CloseHandle(evt);
+        }
+    }
+
+    private static void ReadSpatialBlock(ref FileStream fs, string path, long index, double step, int count, byte[] block, float[][] planes, float gain)
+    {
+        for (int c = 0; c < 6; c++) Array.Clear(planes[c], 0, count);
+        if (index < 0) return;
+        if (Math.Abs(step - 1.0) < 0.001)
+        {
+            if (fs == null) fs = OpenGrowing(path);
+            if (fs == null) return;
+            int got = 0;
+            try
+            {
+                fs.Position = 44L + index * 12L;
+                got = fs.Read(block, 0, count * 12);
+            }
+            catch (IOException) { got = 0; }
+            catch (ArgumentException) { got = 0; }
+            int frames = got / 12;
+            if (got < count * 12 && fs != null)
+            {
+                fs.Dispose();
+                fs = null;
+            }
+            for (int c = 0; c < 6; c++)
+            {
+                for (int i = 0; i < frames; i++)
+                    planes[c][i] = BitConverter.ToInt16(block, i * 12 + c * 2) / 32768f * gain;
+            }
+            return;
+        }
+        for (int i = 0; i < count; i++)
+        {
+            long idx = (long)(index + i * step);
+            if (idx < 0) continue;
+            if (fs == null) fs = OpenGrowing(path);
+            if (fs == null) return;
+            try
+            {
+                fs.Position = 44L + idx * 12L;
+                if (fs.Read(block, 0, 12) != 12)
+                {
+                    fs.Dispose();
+                    fs = null;
+                    return;
+                }
+            }
+            catch (IOException) { return; }
+            catch (ArgumentException) { return; }
+            for (int c = 0; c < 6; c++)
+                planes[c][i] = BitConverter.ToInt16(block, c * 2) / 32768f * gain;
         }
     }
 
