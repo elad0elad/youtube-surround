@@ -72,6 +72,7 @@ function paint(status) {
   let label = labels[shown] || shown;
   if (shown === "active" && lastStatus.outputPath === "stereo-downmix") label = "Stereo downmix";
   if (shown === "active" && lastStatus.outputPath === "spatial-bed") label = "Spatial bed";
+  if ((shown === "active" || shown === "buffering") && lastStatus.device) label += " · " + lastStatus.device;
   badge.textContent = label + (state === "error" && lastStatus.detail ? " — " + lastStatus.detail : "");
   badge.style.display = lastStatus.enabled === false ? "none" : "block";
   const holdBrowserStereo = state === "active" && covered && !adShowing();

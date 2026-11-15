@@ -49,6 +49,12 @@ internal static class Host
     private static bool SpatialAvailable;
     private static int RenderChannels;
     private static volatile int OutputGeneration;
+    private static int DeviceGeneration;
+    private static volatile string PreferredId;
+    private static readonly object DeviceLock = new object();
+    private static readonly HashSet<string> KnownDevices = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    private static IMMDeviceEnumerator DeviceWatch;
+    private static DeviceNotifications DeviceWatchSink;
 
     private static int Main(string[] args)
     {
@@ -134,6 +140,7 @@ internal static class Host
         Stdout = Console.OpenStandardOutput();
         Stream stdin = Console.OpenStandardInput();
         LoadOutputPreference();
+        StartDeviceWatch();
         ResolveRoute();
         Publish();
         var player = new Thread(PlayerLoop);
@@ -418,8 +425,26 @@ internal static class Host
     {
         CoInitializeEx(IntPtr.Zero, 0);
         int playFailures = 0;
+        int seenGen = DeviceGeneration;
+        int lastPoll = Environment.TickCount;
+        string seenSnap = null;
         while (Running)
         {
+            bool due = DeviceGeneration != seenGen || unchecked(Environment.TickCount - lastPoll) > 400;
+            if (due)
+            {
+                seenGen = DeviceGeneration;
+                lastPoll = Environment.TickCount;
+                string snap = DeviceSnapshot();
+                if (snap != seenSnap)
+                {
+                    seenSnap = snap;
+                    Log("output device " + snap);
+                    ResolveRoute();
+                    if (State == "active") Detail = PlayingDetail(true);
+                    Publish();
+                }
+            }
             if (PlayTones)
             {
                 PlayTones = false;
@@ -450,12 +475,16 @@ internal static class Host
             {
                 playFailures++;
                 Log("play " + ex.Message);
-                if (playFailures < 5 && !string.IsNullOrEmpty(WavPath))
+                bool switching = IsDeviceLoss(ex);
+                int limit = switching ? 20 : 5;
+                if (playFailures < limit && !string.IsNullOrEmpty(WavPath))
                 {
                     State = "unavailable";
-                    Detail = "Output was interrupted (" + ex.Message + "). YouTube stereo continues until audio returns.";
+                    Detail = switching
+                        ? "The audio device changed. Switching output. YouTube stereo continues until it returns."
+                        : "Output was interrupted (" + ex.Message + "). YouTube stereo continues until audio returns.";
                     Publish();
-                    Thread.Sleep(500);
+                    Thread.Sleep(switching ? 300 : 500);
                     ResolveRoute();
                     continue;
                 }
@@ -501,8 +530,8 @@ internal static class Host
             if (channels != 6) throw new InvalidOperationException("wav has " + channels + " channels");
             SampleRate = rate;
             int generation = OutputGeneration;
-            IMMDevice dev = PickDevice(OutputPreference == "speakers51" && OutputPath == "discrete-5.1");
-            string openedId = ReadId(dev);
+            IMMDevice dev = PickDevice();
+            string openedSnap = DeviceSnapshot();
             int lastDeviceTick = Environment.TickCount;
             IAudioClient client = Activate(dev);
             IntPtr mix = IntPtr.Zero;
@@ -547,10 +576,10 @@ internal static class Host
                 var frame = new byte[channels * 2];
                 while (Running && WavPath == path && !PlayTones && OutputGeneration == generation)
                 {
-                    if (unchecked(Environment.TickCount - lastDeviceTick) > 1000)
+                    if (unchecked(Environment.TickCount - lastDeviceTick) > 400)
                     {
                         lastDeviceTick = Environment.TickCount;
-                        if (!SameEndpoint(openedId)) throw new InvalidOperationException("device changed");
+                        if (DeviceSnapshot() != openedSnap) return;
                     }
                     Clock clock;
                     lock (Gate) clock = ClockNow;
@@ -827,8 +856,7 @@ internal static class Host
         IMMDevice dev = null;
         try
         {
-            bool preferSix = OutputPreference == "speakers51";
-            dev = PickDevice(preferSix);
+            dev = PickDevice();
             DeviceName = ReadName(dev);
             WaveFormat fmt = ReadMix(dev);
             DeviceChannels = fmt.Channels;
@@ -991,6 +1019,7 @@ internal static class Host
     private static int Probe(string[] args)
     {
         OutputPreference = args.Length > 1 ? NormalizeOutput(args[1]) : "auto";
+        StartDeviceWatch();
         ResolveRoute();
         Console.WriteLine("preference=" + OutputPreference);
         Console.WriteLine("path=" + OutputPath);
@@ -1000,6 +1029,7 @@ internal static class Host
         Console.WriteLine("spatialAvailable=" + (SpatialAvailable ? "true" : "false"));
         Console.WriteLine("spatialEngine=" + SpatialEngine);
         Console.WriteLine("outputError=" + OutputError);
+        Console.WriteLine("snapshot=" + DeviceSnapshot());
         Console.WriteLine("RESULT=PROBE_OK");
         return 0;
     }
@@ -1076,19 +1106,28 @@ internal static class Host
 
     private static bool IsTransient(Exception ex)
     {
-        string message = ex == null ? "" : ex.Message;
-        return message.IndexOf("device changed", StringComparison.OrdinalIgnoreCase) >= 0;
+        return IsDeviceLoss(ex);
     }
 
-    private static bool SameEndpoint(string openedId)
+    private static bool IsDeviceLoss(Exception ex)
+    {
+        string message = ex == null ? "" : ex.Message;
+        return message.IndexOf("device changed", StringComparison.OrdinalIgnoreCase) >= 0
+            || message.IndexOf("88890004", StringComparison.OrdinalIgnoreCase) >= 0
+            || message.IndexOf("88890100", StringComparison.OrdinalIgnoreCase) >= 0
+            || message.IndexOf("88890102", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private static string DeviceSnapshot()
     {
         IMMDevice dev = null;
         try
         {
-            dev = PickDevice(OutputPreference == "speakers51");
-            return string.Equals(ReadId(dev), openedId ?? "", StringComparison.OrdinalIgnoreCase);
+            dev = PickDevice();
+            WaveFormat fmt = ReadMix(dev);
+            return (ReadId(dev) ?? "") + "|" + (ReadName(dev) ?? "") + "|" + fmt.Channels + "|" + fmt.ChannelMask.ToString("X");
         }
-        catch { return false; }
+        catch (Exception ex) { return "unavailable|" + ex.Message; }
         finally { if (dev != null) Marshal.ReleaseComObject(dev); }
     }
 
@@ -1206,9 +1245,9 @@ internal static class Host
             if (channels != 6) throw new InvalidOperationException("wav has " + channels + " channels");
             if (rate != 48000) throw new InvalidOperationException("spatial path expects 48000 Hz");
             SampleRate = rate;
-            dev = PickDevice(false);
+            dev = PickDevice();
             DeviceName = ReadName(dev);
-            string openedId = ReadId(dev);
+            string openedSnap = DeviceSnapshot();
             client = ActivateSpatial(dev);
             Guid streamId = new Guid("BAB5F473-B423-477B-85F5-B5A332A04153");
             int available = client.IsSpatialAudioStreamAvailable(ref streamId, IntPtr.Zero);
@@ -1269,10 +1308,10 @@ internal static class Host
             while (Running && WavPath == path && !PlayTones && OutputGeneration == generation)
             {
                 uint waited = WaitForSingleObject(evt, 50);
-                if (unchecked(Environment.TickCount - lastDeviceTick) > 1000)
+                if (unchecked(Environment.TickCount - lastDeviceTick) > 400)
                 {
                     lastDeviceTick = Environment.TickCount;
-                    if (!SameEndpoint(openedId)) throw new InvalidOperationException("device changed");
+                    if (DeviceSnapshot() != openedSnap) return;
                 }
                 Clock clock;
                 lock (Gate) clock = ClockNow;
@@ -1469,25 +1508,80 @@ internal static class Host
         return -1;
     }
 
-    private static IMMDevice PickDevice(bool preferSix)
+    private static IMMDevice PickDevice()
     {
         IMMDeviceEnumerator en = (IMMDeviceEnumerator)new MMDeviceEnumeratorCom();
-        IMMDevice chosen = null;
-        if (preferSix)
+        string preferred;
+        lock (DeviceLock) preferred = PreferredId;
+        if (!string.IsNullOrEmpty(preferred))
+        {
+            IMMDevice chosen;
+            if (en.GetDevice(preferred, out chosen) == 0 && chosen != null)
+            {
+                int state;
+                if (chosen.GetState(out state) == 0 && state == 1)
+                {
+                    Marshal.ReleaseComObject(en);
+                    return chosen;
+                }
+                Marshal.ReleaseComObject(chosen);
+            }
+            lock (DeviceLock) { if (PreferredId == preferred) PreferredId = null; }
+        }
+        IMMDevice media = null;
+        try { media = en.GetDefaultAudioEndpoint(0, 2); } catch { media = null; }
+        IMMDevice console = en.GetDefaultAudioEndpoint(0, 1);
+        if (media != null)
+        {
+            bool same = string.Equals(ReadId(media), ReadId(console), StringComparison.OrdinalIgnoreCase);
+            if (!same)
+            {
+                Marshal.ReleaseComObject(console);
+                Marshal.ReleaseComObject(en);
+                return media;
+            }
+            Marshal.ReleaseComObject(media);
+        }
+        Marshal.ReleaseComObject(en);
+        return console;
+    }
+
+    private static void StartDeviceWatch()
+    {
+        if (DeviceWatch != null) return;
+        try
+        {
+            RememberDevices();
+            DeviceWatch = (IMMDeviceEnumerator)new MMDeviceEnumeratorCom();
+            DeviceWatchSink = new DeviceNotifications();
+            int hr = DeviceWatch.RegisterEndpointNotificationCallback(DeviceWatchSink);
+            Log("device watch 0x" + hr.ToString("X8"));
+        }
+        catch (Exception ex) { Log("device watch " + ex.Message); }
+    }
+
+    private static void RememberDevices()
+    {
+        IMMDeviceEnumerator en = (IMMDeviceEnumerator)new MMDeviceEnumeratorCom();
+        try
         {
             IMMDeviceCollection all = en.EnumAudioEndpoints(0, 1);
             int count = all.GetCount();
+            var ids = new List<string>();
             for (int i = 0; i < count; i++)
             {
                 IMMDevice d = all.Item(i);
-                if (chosen == null && MixChannels(d) >= 6) chosen = d;
-                else Marshal.ReleaseComObject(d);
+                ids.Add(ReadId(d));
+                Marshal.ReleaseComObject(d);
             }
             Marshal.ReleaseComObject(all);
+            lock (DeviceLock)
+            {
+                KnownDevices.Clear();
+                for (int i = 0; i < ids.Count; i++) if (!string.IsNullOrEmpty(ids[i])) KnownDevices.Add(ids[i]);
+            }
         }
-        if (chosen == null) chosen = en.GetDefaultAudioEndpoint(0, 1);
-        Marshal.ReleaseComObject(en);
-        return chosen;
+        finally { Marshal.ReleaseComObject(en); }
     }
 
     private static void ClearMeasured()
@@ -1652,9 +1746,73 @@ internal static class Host
         IMMDeviceCollection EnumAudioEndpoints(int dataFlow, int stateMask);
         IMMDevice GetDefaultAudioEndpoint(int dataFlow, int role);
         [PreserveSig] int GetDevice(string id, out IMMDevice device);
-        [PreserveSig] int RegisterEndpointNotificationCallback(IntPtr client);
-        [PreserveSig] int UnregisterEndpointNotificationCallback(IntPtr client);
+        [PreserveSig] int RegisterEndpointNotificationCallback(IMMNotificationClient client);
+        [PreserveSig] int UnregisterEndpointNotificationCallback(IMMNotificationClient client);
     }
+    [Guid("7991EEC9-7E89-4D85-8390-6C703CEC60C0"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IMMNotificationClient
+    {
+        [PreserveSig] int OnDeviceStateChanged([MarshalAs(UnmanagedType.LPWStr)] string id, int newState);
+        [PreserveSig] int OnDeviceAdded([MarshalAs(UnmanagedType.LPWStr)] string id);
+        [PreserveSig] int OnDeviceRemoved([MarshalAs(UnmanagedType.LPWStr)] string id);
+        [PreserveSig] int OnDefaultDeviceChanged(int flow, int role, [MarshalAs(UnmanagedType.LPWStr)] string id);
+        [PreserveSig] int OnPropertyValueChanged([MarshalAs(UnmanagedType.LPWStr)] string id, PropertyKey key);
+    }
+    [ComVisible(true), ClassInterface(ClassInterfaceType.None)]
+    private class DeviceNotifications : IMMNotificationClient
+    {
+        public int OnDeviceStateChanged(string id, int newState)
+        {
+            if (string.IsNullOrEmpty(id)) return 0;
+            lock (DeviceLock)
+            {
+                if (newState == 1)
+                {
+                    if (!KnownDevices.Contains(id)) PreferredId = id;
+                    KnownDevices.Add(id);
+                }
+                else
+                {
+                    KnownDevices.Remove(id);
+                    if (string.Equals(PreferredId, id, StringComparison.OrdinalIgnoreCase)) PreferredId = null;
+                }
+            }
+            Interlocked.Increment(ref DeviceGeneration);
+            return 0;
+        }
+        public int OnDeviceAdded(string id) { return 0; }
+        public int OnDeviceRemoved(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return 0;
+            lock (DeviceLock)
+            {
+                KnownDevices.Remove(id);
+                if (string.Equals(PreferredId, id, StringComparison.OrdinalIgnoreCase)) PreferredId = null;
+            }
+            Interlocked.Increment(ref DeviceGeneration);
+            return 0;
+        }
+        public int OnDefaultDeviceChanged(int flow, int role, string id)
+        {
+            if (flow != 0 || string.IsNullOrEmpty(id)) return 0;
+            lock (DeviceLock)
+            {
+                PreferredId = id;
+                KnownDevices.Add(id);
+            }
+            Interlocked.Increment(ref DeviceGeneration);
+            return 0;
+        }
+        public int OnPropertyValueChanged(string id, PropertyKey key)
+        {
+            if (key.pid != 0) return 0;
+            if (key.fmtid != DeviceFormatKey && key.fmtid != OemFormatKey) return 0;
+            Interlocked.Increment(ref DeviceGeneration);
+            return 0;
+        }
+    }
+    private static readonly Guid DeviceFormatKey = new Guid("f19f064d-082c-4e27-bc73-6882a1bb8e4c");
+    private static readonly Guid OemFormatKey = new Guid("e4870e26-3cc5-4cd2-ba46-ca0a9a70ed04");
     [Guid("0BD7A1BE-7A1A-44DB-8397-CC5392387B5E"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     private interface IMMDeviceCollection { int GetCount(); IMMDevice Item(int index); }
     [Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
