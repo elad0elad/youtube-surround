@@ -15,7 +15,7 @@ The browser alone does not deliver those six channels. A small Windows program n
 
 ## Download
 
-The current Windows installer is [YouTube Surround 1.0.0](https://github.com/elad0elad/youtube-surround/releases/tag/v1.0.0). Run `YouTube.Surround.Setup.exe`. The guide opens when installation finishes.
+The current Windows installer is [YouTube Surround 1.1.0](https://github.com/elad0elad/youtube-surround/releases/tag/v1.1.0). Run `YouTube.Surround.Setup.exe`. The guide opens when installation finishes.
 
 ## Install
 
@@ -49,7 +49,7 @@ While 5.1 is actually playing, the original YouTube stereo track is muted. Ads a
 ## Limits
 
 - Not every video has an IAMF stream. The Samsung TV client is the path that currently exposes format 773. YouTube can change or remove it.
-- The audio file is downloaded and decoded before the six-channel playback starts. For the 12-minute test video that took a few seconds. YouTube stereo plays during that wait.
+- Playback starts as soon as the first seconds of 5.1 audio are decoded. The rest of a long video keeps downloading in the background. Seeking past the downloaded part plays YouTube's stereo until the surround audio catches up.
 - Two YouTube tabs do not share one clock. The visible tab owns the surround playback.
 - This build is installed for the current Windows user. It is not a Chrome Web Store package.
 
@@ -85,7 +85,7 @@ YouTube Surround משמיע זרם IAMF אמיתי מ־YouTube כשישה ערו
 
 ## הורדה
 
-קובץ ההתקנה ל־Windows נמצא בשחרור [YouTube Surround 1.0.0](https://github.com/elad0elad/youtube-surround/releases/tag/v1.0.0). מריצים את `YouTube.Surround.Setup.exe`. בסיום נפתח דף ההפעלה.
+קובץ ההתקנה ל־Windows נמצא בשחרור [YouTube Surround 1.1.0](https://github.com/elad0elad/youtube-surround/releases/tag/v1.1.0). מריצים את `YouTube.Surround.Setup.exe`. בסיום נפתח דף ההפעלה. הניגון מתחיל אחרי השניות הראשונות, והמשך הקובץ יורד ברקע.
 
 ## התקנה
 

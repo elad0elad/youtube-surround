@@ -19,6 +19,55 @@ pub struct Sample {
     pub data: Vec<u8>,
 }
 
+pub enum Polled {
+    NeedMore,
+    Skip(usize),
+    Moov { end: usize, descriptors: Vec<u8> },
+    Moof { end: usize, samples: Vec<Sample> },
+}
+
+/// One complete top-level box, or [`Polled::NeedMore`] when the bytes for
+/// that box (including the media samples it points at) are not here yet.
+pub fn poll_box(data: &[u8], offset: usize) -> Result<Polled, String> {
+    if offset + 8 > data.len() {
+        return Ok(Polled::NeedMore);
+    }
+    let mut size = u32::from_be_bytes(data[offset..offset + 4].try_into().unwrap()) as u64;
+    let mut header = 8usize;
+    let typ: [u8; 4] = data[offset + 4..offset + 8].try_into().unwrap();
+    if size == 1 {
+        if offset + 16 > data.len() {
+            return Ok(Polled::NeedMore);
+        }
+        size = u64::from_be_bytes(data[offset + 8..offset + 16].try_into().unwrap());
+        header = 16;
+    } else if size == 0 {
+        // A size of 0 means "until the end of the file". A growing stream
+        // cannot know that end yet.
+        return Ok(Polled::NeedMore);
+    }
+    if size < header as u64 {
+        return Err("box smaller than its header".into());
+    }
+    let end = offset.saturating_add(size as usize);
+    if end > data.len() {
+        return Ok(Polled::NeedMore);
+    }
+    let body = offset + header;
+    match &typ {
+        b"moov" => {
+            let (descriptors, _timescale) = parse_moov(&data[body..end])?;
+            Ok(Polled::Moov { end, descriptors })
+        }
+        b"moof" => match parse_moof(data, offset, body, end) {
+            Ok(samples) => Ok(Polled::Moof { end, samples }),
+            Err(err) if err.contains("outside") => Ok(Polled::NeedMore),
+            Err(err) => Err(err),
+        },
+        _ => Ok(Polled::Skip(end)),
+    }
+}
+
 pub fn read_iamf_mp4(path: &Path) -> Result<IamfTrack, String> {
     let mut file = File::open(path).map_err(|e| format!("open {}: {e}", path.display()))?;
     let len = file.seek(SeekFrom::End(0)).map_err(|e| e.to_string())? as usize;

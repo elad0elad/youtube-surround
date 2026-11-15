@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YouTube Surround",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Plays real YouTube IAMF as discrete 5.1. Stereo stays stereo. No upmix. © elad0elad",
   "author": "elad0elad",
   "homepage_url": "https://github.com/elad0elad/youtube-surround",

@@ -67,10 +67,18 @@ function paint(status) {
     buffering: "Buffering"
   };
   const state = lastStatus.state || "idle";
-  badge.textContent = (labels[state] || state) + (state === "error" && lastStatus.detail ? " — " + lastStatus.detail : "");
+  const covered = bufferCoversPlayhead();
+  const shown = state === "active" && !covered ? "buffering" : state;
+  badge.textContent = (labels[shown] || shown) + (state === "error" && lastStatus.detail ? " — " + lastStatus.detail : "");
   badge.style.display = lastStatus.enabled === false ? "none" : "block";
-  const holdBrowserStereo = state === "active" && !adShowing();
+  const holdBrowserStereo = state === "active" && covered && !adShowing();
   setStereoAudible(!holdBrowserStereo);
+}
+
+function bufferCoversPlayhead() {
+  const buffered = Number(lastStatus && lastStatus.bufferSeconds);
+  if (!Number.isFinite(buffered) || !video) return false;
+  return buffered + 0.15 >= (video.currentTime || 0);
 }
 
 function wire(next) {

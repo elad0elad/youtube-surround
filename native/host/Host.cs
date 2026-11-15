@@ -32,6 +32,10 @@ internal static class Host
     private static string WavPath;
     private static string M4aPath;
     private static Process Child;
+    private static Process DownloadProc;
+    private static Process DecodeProc;
+    private static int LoadGeneration;
+    private static int LastPublishTick;
     private static Clock ClockNow = new Clock();
     private static bool PlayTones;
     private static double CliStopAt = -1;
@@ -210,19 +214,8 @@ internal static class Host
             State = "checking";
             Detail = "Looking for an IAMF audio stream.";
             Publish();
-            string m4a = Download(url);
-            if (VideoId != id) { TryDelete(m4a); return; }
-            M4aPath = m4a;
-            State = "decoding";
-            Detail = "Decoding IAMF to 5.1 PCM.";
-            Publish();
-            string wav = Decode(m4a, 0);
-            if (VideoId != id) { TryDelete(wav); StopPlayback(); return; }
-            WavPath = wav;
-            State = "active";
-            OutputChannels = 6;
-            Detail = "5.1 is playing. YouTube's stereo track is muted.";
-            Publish();
+            int generation = LoadGeneration;
+            StreamAudio(url, id, generation);
         }
         catch (Exception ex)
         {
@@ -242,6 +235,120 @@ internal static class Host
             }
             Publish();
         }
+    }
+
+    private static void StreamAudio(string url, string id, int generation)
+    {
+        string ytdlp = Tool("yt-dlp.exe", "YS_YTDLP");
+        string deno = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "deno.exe");
+        string runtime = File.Exists(deno) ? " --js-runtimes " + Q("deno:" + deno) : "";
+        string decoder = Tool("ys-iamf.exe", "YS_IAMF");
+        string m4a = Path.Combine(Path.GetTempPath(), "ys-" + Guid.NewGuid().ToString("N") + ".m4a");
+        string wav = Path.ChangeExtension(m4a, ".wav");
+        M4aPath = m4a;
+        string dlArgs = "--no-playlist --no-warnings --no-progress --no-part --fixup never" + runtime
+            + " --extractor-args " + Q("youtube:player_client=tv_samsung")
+            + " -f 773 -o " + Q(m4a) + " " + Q(url);
+        string decArgs = "--follow " + Q(m4a) + " -o " + Q(wav);
+        Log("stream " + url);
+        var downloadNotes = new StringBuilder();
+        Process download = StartTool(ytdlp, dlArgs);
+        download.ErrorDataReceived += delegate(object s, DataReceivedEventArgs e) { if (e.Data != null) downloadNotes.AppendLine(e.Data); };
+        download.BeginErrorReadLine();
+        download.BeginOutputReadLine();
+        try { download.StandardInput.Close(); } catch { }
+        Process decode = StartTool(decoder, decArgs);
+        decode.BeginOutputReadLine();
+        try { decode.StandardInput.Close(); } catch { }
+        DownloadProc = download;
+        DecodeProc = decode;
+        var waiter = new Thread(() =>
+        {
+            try { download.WaitForExit(); } catch { }
+            try { File.WriteAllText(m4a + ".done", "1"); } catch { }
+        });
+        waiter.IsBackground = true;
+        waiter.Start();
+        bool ready = false;
+        double lastPublished = 0;
+        string line;
+        while ((line = decode.StandardError.ReadLine()) != null)
+        {
+            if (generation != LoadGeneration || VideoId != id) break;
+            if (line.StartsWith("decoder:"))
+            {
+                var mix = Regex.Match(line, @"mix_id=(\d+)");
+                var ch = Regex.Match(line, @"channels=(\d+)");
+                var rate = Regex.Match(line, @"rate=(\d+)");
+                if (mix.Success) MixId = int.Parse(mix.Groups[1].Value);
+                if (ch.Success) OutputChannels = int.Parse(ch.Groups[1].Value);
+                if (rate.Success) SampleRate = int.Parse(rate.Groups[1].Value);
+                State = "decoding";
+                Detail = "Decoding IAMF as it downloads.";
+                Publish();
+            }
+            else if (line.StartsWith("ready ") || line.StartsWith("progress "))
+            {
+                var audio = Regex.Match(line, @"audio=([0-9.]+)");
+                double seconds = audio.Success ? double.Parse(audio.Groups[1].Value, CultureInfo.InvariantCulture) : 0;
+                if (!ready)
+                {
+                    ready = true;
+                    M4aPath = null;
+                    WavPath = wav;
+                    OutputChannels = 6;
+                    State = "active";
+                    Detail = "5.1 is playing while the rest of the audio downloads.";
+                    Publish();
+                    lastPublished = seconds;
+                }
+                else if (seconds >= lastPublished + 1.0 && unchecked(Environment.TickCount - LastPublishTick) > 1000)
+                {
+                    lastPublished = seconds;
+                    LastPublishTick = Environment.TickCount;
+                    Publish(false);
+                }
+            }
+            else if (line.StartsWith("error:") || line.StartsWith("RESULT=")) Log(line);
+        }
+        try { if (!decode.HasExited) decode.WaitForExit(5000); } catch { }
+        try { if (!download.HasExited) download.WaitForExit(5000); } catch { }
+        if (generation != LoadGeneration || VideoId != id) return;
+        if (!ready)
+        {
+            TryDelete(wav);
+            string tail = "";
+            tail = downloadNotes.ToString();
+            StopPlayback();
+            ClearMeasured();
+            State = "stereo";
+            Detail = "This video has no IAMF surround stream. Stereo continues.";
+            if (download.HasExited && download.ExitCode == 0) Detail = "The surround stream could not be decoded. Stereo continues.";
+            Log("stream missed " + Tail(tail));
+            Publish();
+            return;
+        }
+        if (decode.HasExited && decode.ExitCode == 0)
+        {
+            Detail = "5.1 is playing. YouTube's stereo track is muted.";
+            Publish(false);
+        }
+        Log("stream finished ready=" + ready);
+    }
+
+    private static Process StartTool(string file, string args)
+    {
+        Log("run " + file + " " + args);
+        var psi = new ProcessStartInfo {
+            FileName = file,
+            Arguments = args,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            RedirectStandardInput = true
+        };
+        return Process.Start(psi);
     }
 
     private static string Download(string url)
@@ -327,8 +434,10 @@ internal static class Host
 
     private static void PlayWavFollowClock(string path, Clock initial, double stopAt)
     {
-        using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, (FileShare)7))
+        FileStream fs = null;
+        try
         {
+            fs = new FileStream(path, FileMode.Open, FileAccess.Read, (FileShare)7);
             var header = new byte[44];
             if (fs.Read(header, 0, 44) != 44) throw new InvalidDataException("short wav");
             int channels = BitConverter.ToInt16(header, 22);
@@ -388,9 +497,22 @@ internal static class Host
                             if (idx >= 0)
                             {
                                 byte[] block = new byte[want * frame.Length];
-                                fs.Position = 44L + idx * frame.Length;
-                                int got = fs.Read(block, 0, block.Length);
+                                if (fs == null) fs = new FileStream(path, FileMode.Open, FileAccess.Read, (FileShare)7);
+                                int got = 0;
+                                try
+                                {
+                                    fs.Position = 44L + idx * frame.Length;
+                                    got = fs.Read(block, 0, block.Length);
+                                }
+                                catch (IOException) { got = 0; }
+                                catch (ArgumentException) { got = 0; }
                                 int framesGot = got / frame.Length;
+                                if (fs != null && got < block.Length)
+                                {
+                                    fs.Dispose();
+                                    fs = null;
+                                    if (framesGot == 0) Thread.Sleep(30);
+                                }
                                 for (int i = 0; i < framesGot; i++)
                                 {
                                     for (int c = 0; c < 6; c++)
@@ -408,8 +530,14 @@ internal static class Host
                             {
                                 long idx = (long)(srcOrigin + i * step);
                                 if (idx < 0) continue;
+                                if (fs == null) fs = new FileStream(path, FileMode.Open, FileAccess.Read, (FileShare)7);
                                 fs.Position = 44L + idx * frame.Length;
-                                if (fs.Read(frame, 0, frame.Length) != frame.Length) break;
+                                if (fs.Read(frame, 0, frame.Length) != frame.Length)
+                                {
+                                    fs.Dispose();
+                                    fs = null;
+                                    break;
+                                }
                                 for (int c = 0; c < 6; c++)
                                 {
                                     if (map[c] < 0 || map[c] >= fmt.Channels) continue;
@@ -428,11 +556,16 @@ internal static class Host
             }
             finally
             {
+                if (fs != null) fs.Dispose();
                 if (render != null) Marshal.ReleaseComObject(render);
                 if (mix != IntPtr.Zero) Marshal.FreeCoTaskMem(mix);
                 Marshal.ReleaseComObject(client);
                 Marshal.ReleaseComObject(dev);
             }
+        }
+        finally
+        {
+            if (fs != null) fs.Dispose();
         }
     }
 
@@ -504,13 +637,37 @@ internal static class Host
 
     private static void StopPlayback()
     {
+        LoadGeneration++;
         string wav = WavPath;
         string m4a = M4aPath;
         WavPath = null;
         M4aPath = null;
-        if (Child != null && !Child.HasExited) try { Child.Kill(); } catch { }
+        KillTree(Child);
+        KillTree(DownloadProc);
+        KillTree(DecodeProc);
+        Child = null;
+        DownloadProc = null;
+        DecodeProc = null;
         TryDelete(m4a);
+        if (!string.IsNullOrEmpty(m4a)) TryDelete(m4a + ".done");
         TryDelete(wav);
+    }
+
+    private static void KillTree(Process process)
+    {
+        if (process == null) return;
+        try
+        {
+            if (process.HasExited) return;
+            Process.Start(new ProcessStartInfo {
+                FileName = "taskkill.exe",
+                Arguments = "/PID " + process.Id + " /T /F",
+                CreateNoWindow = true,
+                UseShellExecute = false
+            }).WaitForExit(5000);
+        }
+        catch (Exception ex) { Log("kill " + ex.Message); }
+        try { if (!process.HasExited) process.Kill(); } catch { }
     }
 
     private static void ApplyUserMix(Dictionary<string, object> msg)
@@ -551,6 +708,11 @@ internal static class Host
 
     private static void Publish()
     {
+        Publish(true);
+    }
+
+    private static void Publish(bool writeLog)
+    {
         var msg = new Dictionary<string, object> {
             { "type", "status" },
             { "state", State },
@@ -571,7 +733,7 @@ internal static class Host
             long bytes = new FileInfo(WavPath).Length - 44;
             if (bytes > 0) msg["bufferSeconds"] = Math.Round(bytes / (double)(SampleRate * OutputChannels * 2), 1);
         }
-        Log("status " + State + " " + Detail);
+        if (writeLog) Log("status " + State + " " + Detail);
         if (Stdout == null)
         {
             Console.WriteLine(State + " " + Detail);
