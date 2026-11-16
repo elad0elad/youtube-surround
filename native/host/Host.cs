@@ -168,9 +168,11 @@ internal static class Host
     private static void Handle(Dictionary<string, object> msg)
     {
         string type = Str(msg, "type");
-        Log("msg " + type + " video=" + Str(msg, "videoId") + " t=" + Num(msg, "time", -1).ToString("F2", CultureInfo.InvariantCulture));
+        if (type != "clock") Log("msg " + type + " video=" + Str(msg, "videoId") + " t=" + Num(msg, "time", -1).ToString("F2", CultureInfo.InvariantCulture));
         if (type == "stop")
         {
+            string stopId = Str(msg, "videoId");
+            if (!string.IsNullOrEmpty(stopId) && !string.IsNullOrEmpty(VideoId) && stopId != VideoId) return;
             StopPlayback();
             ClearMeasured();
             State = "idle";
@@ -257,6 +259,11 @@ internal static class Host
                 State = "stereo";
                 Detail = "This video has no IAMF surround stream. Stereo continues.";
             }
+            else if (ex.Message.IndexOf("Stereo continues", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                State = "stereo";
+                Detail = ex.Message;
+            }
             else
             {
                 State = "error";
@@ -318,6 +325,8 @@ internal static class Host
             }
             else if (line.StartsWith("ready ") || line.StartsWith("progress "))
             {
+                if (File.Exists(wav) && new FileInfo(wav).Length > 3800000000L)
+                    throw new InvalidOperationException("This video is too long for one surround file (about two hours). Stereo continues.");
                 var audio = Regex.Match(line, @"audio=([0-9.]+)");
                 double seconds = audio.Success ? double.Parse(audio.Groups[1].Value, CultureInfo.InvariantCulture) : 0;
                 if (!ready)
@@ -346,13 +355,16 @@ internal static class Host
         if (!ready)
         {
             TryDelete(wav);
-            string tail = "";
-            tail = downloadNotes.ToString();
+            string tail = downloadNotes.ToString();
+            string lowered = tail.ToLowerInvariant();
+            bool noFormat = lowered.IndexOf("requested format is not available") >= 0;
+            bool downloadFailed = lowered.IndexOf("http error") >= 0 || lowered.IndexOf("error:") >= 0 || (download.HasExited && download.ExitCode != 0);
             StopPlayback();
             ClearMeasured();
             State = "stereo";
-            Detail = "This video has no IAMF surround stream. Stereo continues.";
-            if (download.HasExited && download.ExitCode == 0) Detail = "The surround stream could not be decoded. Stereo continues.";
+            if (noFormat) Detail = "This video has no IAMF surround stream. Stereo continues.";
+            else if (downloadFailed) Detail = "The surround track could not be downloaded. Stereo continues.";
+            else Detail = "The surround stream could not be decoded. Stereo continues.";
             Log("stream missed " + Tail(tail));
             Publish();
             return;
@@ -689,6 +701,7 @@ internal static class Host
         // Reuse the wav player by writing a temp wav.
         string path = Path.Combine(Path.GetTempPath(), "ys-tones.wav");
         WriteWav(path, pcm, 6, rate);
+        int generation = LoadGeneration;
         string previous = WavPath;
         string previousState = State;
         string previousDetail = Detail;
@@ -696,13 +709,26 @@ internal static class Host
         State = "active";
         Detail = "Playing test tones through " + OutputPath + ".";
         lock (Gate) { ClockNow = new Clock { Time = 0, Rate = 1, Paused = false, Mono = Stopwatch.GetTimestamp() }; CliStopAt = seconds; }
-        PlayWavFollowClock(path, ClockNow, seconds);
-        WavPath = previous;
-        CliStopAt = -1;
-        State = previousState;
-        Detail = previousDetail;
-        TryDelete(path);
-        if (Running) Publish();
+        try
+        {
+            PlayWavFollowClock(path, ClockNow, seconds);
+        }
+        finally
+        {
+            TryDelete(path);
+            if (generation != LoadGeneration)
+            {
+                TryDelete(previous);
+            }
+            else
+            {
+                WavPath = previous;
+                CliStopAt = -1;
+                State = previousState;
+                Detail = previousDetail;
+                if (Running) Publish();
+            }
+        }
     }
 
     private static void WriteWav(string path, float[] samples, int channels, int rate)
@@ -885,6 +911,12 @@ internal static class Host
             {
                 OutputPath = "spatial-bed";
                 RenderChannels = 6;
+                bool dolbyEngine = SpatialEngine.IndexOf("Dolby Atmos", StringComparison.OrdinalIgnoreCase) >= 0;
+                if (OutputPreference == "atmos" && !dolbyEngine)
+                {
+                    string through = SpatialEngine.Length == 0 ? "Windows Spatial Audio" : SpatialEngine;
+                    OutputError = "Dolby Atmos is not the spatial format selected in Windows. Playback is going through " + through + ".";
+                }
             }
             else if (OutputPreference == "speakers51" || OutputPreference == "surroundHeadphones" || OutputPreference == "atmos")
             {
@@ -1772,7 +1804,22 @@ internal static class Host
     private static void TryDelete(string path) { try { if (!string.IsNullOrEmpty(path) && File.Exists(path)) File.Delete(path); } catch { } }
     private static void Log(string line)
     {
-        try { File.AppendAllText(LogPath, DateTime.Now.ToString("HH:mm:ss.fff ") + line + "\r\n"); } catch { }
+        try
+        {
+            var info = new FileInfo(LogPath);
+            if (info.Exists && info.Length > 512 * 1024)
+            {
+                byte[] all = File.ReadAllBytes(LogPath);
+                int start = all.Length - 256 * 1024;
+                if (start < 0) start = 0;
+                while (start < all.Length && all[start] != (byte)'\n') start++;
+                if (start < all.Length) start++;
+                using (var fs = new FileStream(LogPath, FileMode.Create, FileAccess.Write, FileShare.Read))
+                    fs.Write(all, start, all.Length - start);
+            }
+            File.AppendAllText(LogPath, DateTime.Now.ToString("HH:mm:ss.fff ") + line + "\r\n");
+        }
+        catch { }
     }
     private static string Str(Dictionary<string, object> m, string key)
     {

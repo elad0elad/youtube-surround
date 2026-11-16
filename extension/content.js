@@ -1,19 +1,22 @@
 const BADGE_ID = "youtube-surround-badge";
+const LEAVE_KEY = "ys-leave";
 
 let video = null;
 let lastVideoId = "";
 let watchSent = false;
 let lastStatus = { state: "idle", enabled: true, mode: "automatic" };
-let wiredVideo = null;
-let audioCtx = null;
-let silenceGain = null;
 let clockTimer = null;
+let wireFailed = false;
 
 function videoIdFromUrl(url) {
   try {
     const u = new URL(url);
-    if (u.hostname === "youtu.be") return u.pathname.slice(1);
-    return u.searchParams.get("v") || "";
+    const fromQuery = u.searchParams.get("v") || "";
+    if (/^[A-Za-z0-9_-]{11}$/.test(fromQuery)) return fromQuery;
+    const parts = u.pathname.split("/").filter(Boolean);
+    if (u.hostname === "youtu.be" && parts[0] && /^[A-Za-z0-9_-]{11}$/.test(parts[0])) return parts[0];
+    if (parts.length >= 2 && /^(shorts|live|embed|v)$/.test(parts[0]) && /^[A-Za-z0-9_-]{11}$/.test(parts[1])) return parts[1];
+    return "";
   } catch (err) {
     return "";
   }
@@ -30,6 +33,8 @@ function adShowing() {
 function ensureBadge() {
   let badge = document.getElementById(BADGE_ID);
   if (badge) return badge;
+  const player = document.querySelector("#movie_player") || document.body;
+  if (!player) return null;
   badge = document.createElement("div");
   badge.id = BADGE_ID;
   badge.style.cssText = [
@@ -46,7 +51,6 @@ function ensureBadge() {
     "pointer-events:none",
     "letter-spacing:.01em"
   ].join(";");
-  const player = document.querySelector("#movie_player") || document.body;
   if (getComputedStyle(player).position === "static") player.style.position = "relative";
   player.appendChild(badge);
   return badge;
@@ -55,6 +59,7 @@ function ensureBadge() {
 function paint(status) {
   lastStatus = status || lastStatus;
   const badge = ensureBadge();
+  if (!badge) return;
   const labels = {
     idle: "YouTube Surround",
     checking: "Checking source",
@@ -73,6 +78,7 @@ function paint(status) {
   if (shown === "active" && lastStatus.outputPath === "stereo-downmix") label = "Stereo downmix";
   if (shown === "active" && lastStatus.outputPath === "spatial-bed") label = /dolby atmos/i.test(lastStatus.spatialEngine || "") ? "Dolby Atmos" : "Spatial bed";
   if ((shown === "active" || shown === "buffering") && lastStatus.device) label += " · " + lastStatus.device;
+  if (wireFailed && state === "active") label += " · refresh the tab";
   badge.textContent = label + (state === "error" && lastStatus.detail ? " — " + lastStatus.detail : "");
   badge.style.display = lastStatus.enabled === false ? "none" : "block";
   const holdBrowserStereo = state === "active" && covered && !adShowing();
@@ -85,33 +91,8 @@ function bufferCoversPlayhead() {
   return buffered + 0.15 >= (video.currentTime || 0);
 }
 
-function wire(next) {
-  if (audioCtx) {
-    audioCtx.close();
-    audioCtx = null;
-    silenceGain = null;
-    wiredVideo = null;
-  }
-  const ctx = new AudioContext();
-  const source = ctx.createMediaElementSource(next);
-  const gain = ctx.createGain();
-  gain.gain.value = 1;
-  source.connect(gain);
-  gain.connect(ctx.destination);
-  audioCtx = ctx;
-  silenceGain = gain;
-  wiredVideo = next;
-}
-
 function setStereoAudible(audible) {
-  if (!video) return;
-  if (audible && !audioCtx) return;
-  if (!audioCtx || wiredVideo !== video) {
-    if (audible) return;
-    try { wire(video); } catch (err) { return; }
-  }
-  silenceGain.gain.value = audible ? 1 : 0;
-  if (audioCtx.state === "suspended") audioCtx.resume();
+  document.dispatchEvent(new CustomEvent("ys-audible", { detail: { audible: !!audible } }));
 }
 
 function userMix() {
@@ -137,7 +118,7 @@ function sendWatch(force) {
     type: "watch",
     force: !!force,
     visible: document.visibilityState === "visible",
-    url: location.href.split("&")[0].split("#")[0],
+    url: location.href.split("#")[0],
     videoId: id,
     time: video.currentTime || 0,
     paused: video.paused,
@@ -165,11 +146,19 @@ function sendClock() {
   });
 }
 
+function stopSurround() {
+  const id = lastVideoId;
+  lastVideoId = "";
+  watchSent = false;
+  if (id) post({ type: "stop", videoId: id });
+  setStereoAudible(true);
+}
+
 function attach(next) {
   if (video === next) return;
   video = next;
   if (!video) return;
-  ["play", "pause", "seeked", "ratechange", "emptied", "volumechange"].forEach((name) => {
+  ["play", "pause", "seeked", "ratechange", "emptied", "volumechange", "ended"].forEach((name) => {
     video.addEventListener(name, () => {
       sendClock();
     });
@@ -179,10 +168,16 @@ function attach(next) {
 function scan() {
   attach(currentVideo());
   const id = videoIdFromUrl(location.href);
-  if (!id) return;
+  if (!id) {
+    if (lastVideoId) stopSurround();
+    const badge = document.getElementById(BADGE_ID);
+    if (badge) badge.style.display = "none";
+    return;
+  }
   if (id !== lastVideoId) {
     lastVideoId = id;
     watchSent = false;
+    wireFailed = false;
   }
   if (!watchSent && video) {
     watchSent = true;
@@ -200,8 +195,15 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 });
 
+document.addEventListener("ys-wire-failed", () => {
+  wireFailed = true;
+  paint(lastStatus);
+});
+document.addEventListener("ys-wire-ok", () => {
+  wireFailed = false;
+});
+
 document.addEventListener("yt-navigate-finish", () => {
-  lastVideoId = "";
   watchSent = false;
   scan();
 });
@@ -213,10 +215,30 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
+window.addEventListener("pagehide", (event) => {
+  if (event.persisted) return;
+  document.dispatchEvent(new CustomEvent("ys-release"));
+  const token = String(Date.now());
+  try { sessionStorage.setItem(LEAVE_KEY, token); } catch (err) {}
+  post({ type: "leaving", videoId: lastVideoId, token: token });
+});
+
 function holdServiceWorker() {
-  const port = chrome.runtime.connect({ name: "youtube-surround" });
-  port.onDisconnect.addListener(() => setTimeout(holdServiceWorker, 250));
+  try {
+    const port = chrome.runtime.connect({ name: "youtube-surround" });
+    port.onDisconnect.addListener(() => {
+      if (chrome.runtime && chrome.runtime.id) setTimeout(holdServiceWorker, 250);
+    });
+  } catch (err) {}
 }
+
+try {
+  const pending = sessionStorage.getItem(LEAVE_KEY);
+  if (pending) {
+    sessionStorage.removeItem(LEAVE_KEY);
+    post({ type: "here", token: pending });
+  }
+} catch (err) {}
 
 clockTimer = setInterval(() => {
   scan();

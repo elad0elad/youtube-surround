@@ -30,8 +30,18 @@ function Remove-Registration {
     }
 }
 
+function Remove-PlaybackTemps {
+    $temp = [System.IO.Path]::GetTempPath()
+    Get-ChildItem -LiteralPath $temp -Force -ErrorAction SilentlyContinue | Where-Object {
+        $_.Name -match '^ys-[0-9a-fA-F]{32}\.(m4a|wav|m4a\.done|m4a\.part)$'
+    } | ForEach-Object {
+        try { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop } catch {}
+    }
+}
+
 if ($Uninstall) {
     Get-Process YouTubeSurroundHost -ErrorAction SilentlyContinue | Stop-Process -Force
+    Remove-PlaybackTemps
     Remove-Registration
     if (Test-Path $Dest) { Remove-Item $Dest -Recurse -Force }
     Write-Host "YouTube Surround was removed."
@@ -85,6 +95,8 @@ if (-not $hostExe) { throw "YouTubeSurroundHost.exe was not found." }
 if (-not $decoder) { throw "ys-iamf.exe was not found." }
 if (-not $deno) { throw "deno.exe was not found. yt-dlp needs it to read YouTube." }
 
+Get-Process YouTubeSurroundHost -ErrorAction SilentlyContinue | Stop-Process -Force
+Start-Sleep -Milliseconds 400
 New-Item -ItemType Directory -Force -Path $Dest | Out-Null
 Copy-Item -LiteralPath $hostExe -Destination (Join-Path $Dest "YouTubeSurroundHost.exe") -Force
 Copy-Item -LiteralPath $decoder -Destination (Join-Path $Dest "ys-iamf.exe") -Force

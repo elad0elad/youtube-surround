@@ -24,7 +24,7 @@ Direct 5.1 needs a shared format that is already six channels. The speaker order
 
 ## Download
 
-The current Windows installer is [YouTube Surround 1.2.4](https://github.com/elad0elad/youtube-surround/releases/tag/v1.2.4). Run `YouTube.Surround.Setup.exe`. The guide opens when installation finishes.
+The current Windows installer is [YouTube Surround 1.2.5](https://github.com/elad0elad/youtube-surround/releases/tag/v1.2.5). Run `YouTube.Surround.Setup.exe`. The guide opens when installation finishes.
 
 ## Install from source
 
@@ -42,6 +42,7 @@ Deno is included because yt-dlp needs a JavaScript runtime to read YouTube.
 - **Stereo** stops the external player and returns YouTube's audio.
 - YouTube's mute button and volume slider also control the external player.
 - While the external player is covering the current position, YouTube's stereo is silent. Ads, a seek past the downloaded audio, and any failure return that stereo. The video is not stopped.
+- Closing the tab or window, or leaving the video page, stops the external player.
 
 ## Remove
 
@@ -101,7 +102,7 @@ YouTube Surround משמיע זרם IAMF אמיתי מ־YouTube ב־Windows. אי
 
 ## הורדה
 
-קובץ ההתקנה נמצא בשחרור [YouTube Surround 1.2.4](https://github.com/elad0elad/youtube-surround/releases/tag/v1.2.4). מריצים את `YouTube.Surround.Setup.exe`. בסיום נפתחות ההוראות.
+קובץ ההתקנה נמצא בשחרור [YouTube Surround 1.2.5](https://github.com/elad0elad/youtube-surround/releases/tag/v1.2.5). מריצים את `YouTube.Surround.Setup.exe`. בסיום נפתחות ההוראות.
 
 ## התקנה מקוד המקור
 
@@ -117,6 +118,7 @@ YouTube Surround משמיע זרם IAMF אמיתי מ־YouTube ב־Windows. אי
 - **Stereo** עוצר את הנגן החיצוני ומחזיר את השמע של YouTube.
 - כפתור ההשתקה והמחוון של YouTube שולטים גם בנגן החיצוני.
 - בזמן שהנגן החיצוני מכסה את מיקום הניגון, הסטריאו של YouTube שקט. פרסומת, קפיצה מעבר לחלק שירד, או כשל מחזירים את הסטריאו. הסרטון לא נעצר.
+- סגירת הלשונית או החלון, או יציאה מדף הסרטון, עוצרת את הנגן החיצוני.
 
 ## הסרה
 

@@ -31,6 +31,61 @@ function broadcast() {
 }
 
 let connectFailedAt = 0;
+let leaveTimer = null;
+let leaveTabId = null;
+let leaveToken = null;
+
+function cancelLeave(token) {
+  if (token && leaveToken && token !== leaveToken) return;
+  if (leaveTimer) clearTimeout(leaveTimer);
+  leaveTimer = null;
+  leaveTabId = null;
+  leaveToken = null;
+}
+
+function scheduleLeave(tabId, videoId, token) {
+  cancelLeave(null);
+  leaveTabId = tabId;
+  leaveToken = token || null;
+  leaveTimer = setTimeout(() => {
+    leaveTimer = null;
+    leaveToken = null;
+    if (tabId != null && activeTabId != null && tabId !== activeTabId) return;
+    activeTabId = null;
+    send({ type: "stop", videoId: videoId || "" });
+  }, 3000);
+}
+
+function videoIdFromUrl(url) {
+  try {
+    const u = new URL(url);
+    const fromQuery = u.searchParams.get("v") || "";
+    if (/^[A-Za-z0-9_-]{11}$/.test(fromQuery)) return fromQuery;
+    const parts = u.pathname.split("/").filter(Boolean);
+    if (u.hostname === "youtu.be" && parts[0] && /^[A-Za-z0-9_-]{11}$/.test(parts[0])) return parts[0];
+    if (parts.length >= 2 && /^(shorts|live|embed|v)$/.test(parts[0]) && /^[A-Za-z0-9_-]{11}$/.test(parts[1])) return parts[1];
+    return "";
+  } catch (err) {
+    return "";
+  }
+}
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (leaveTabId === tabId) cancelLeave(null);
+  if (activeTabId == null || tabId !== activeTabId) return;
+  activeTabId = null;
+  send({ type: "stop" });
+});
+
+chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
+  if (activeTabId == null || tabId !== activeTabId) return;
+  const url = info.url || (tab && tab.url) || "";
+  if (!url || url.indexOf("http") !== 0) return;
+  if (videoIdFromUrl(url)) return;
+  activeTabId = null;
+  cancelLeave(null);
+  send({ type: "stop" });
+});
 
 function connect() {
   if (port) return;
@@ -82,6 +137,23 @@ chrome.runtime.onConnect.addListener(() => {});
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || !message.type) return;
+  if (message.type === "here") {
+    if (!sender.tab || leaveTabId == null || sender.tab.id === leaveTabId) cancelLeave(message.token || "");
+    sendResponse(status);
+    return;
+  }
+  if (message.type === "leaving") {
+    if (sender.tab && activeTabId != null && sender.tab.id !== activeTabId) {
+      sendResponse(status);
+      return;
+    }
+    scheduleLeave(sender.tab ? sender.tab.id : activeTabId, message.videoId, message.token);
+    sendResponse(status);
+    return;
+  }
+  if ((message.type === "watch" || message.type === "clock") && sender.tab && (leaveTabId == null || sender.tab.id === leaveTabId)) {
+    cancelLeave(null);
+  }
   if (message.type === "getStatus") {
     connect();
     sendResponse(status);
