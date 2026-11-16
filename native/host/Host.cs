@@ -1673,8 +1673,8 @@ internal static class Host
             lock (DeviceLock) { if (PreferredId == preferred) PreferredId = null; }
         }
         IMMDevice media = null;
-        try { media = en.GetDefaultAudioEndpoint(0, 2); } catch { media = null; }
-        IMMDevice console = en.GetDefaultAudioEndpoint(0, 1);
+        try { media = en.GetDefaultAudioEndpoint(0, 1); } catch { media = null; }
+        IMMDevice console = en.GetDefaultAudioEndpoint(0, 0);
         if (media != null)
         {
             bool same = string.Equals(ReadId(media), ReadId(console), StringComparison.OrdinalIgnoreCase);
@@ -1955,7 +1955,7 @@ internal static class Host
         }
         public int OnDefaultDeviceChanged(int flow, int role, string id)
         {
-            if (flow != 0 || string.IsNullOrEmpty(id)) return 0;
+            if (flow != 0 || role == 2 || string.IsNullOrEmpty(id)) return 0;
             lock (DeviceLock)
             {
                 PreferredId = id;

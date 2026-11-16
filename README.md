@@ -18,13 +18,13 @@ Choose the output in the extension popup. The choice is saved.
 | Surround Headphones | Direct multichannel audio when the Windows device is already accepting six channels. |
 | Stereo Headphones | A downmix that keeps the center, the surrounds, and the LFE. |
 
-The popup shows the route that is actually playing, the device name, and a plain error when the selected mode cannot be opened. Connecting headphones or speakers during playback switches the output to that device. Test Audio plays one tone on each channel.
+The popup shows the route that is actually playing, the device name, and a plain error when the selected mode cannot be opened. Playback follows the Windows playback device. A headset selected only for calls does not take the movie. Connecting headphones or speakers during playback switches the output to that device. Test Audio plays one tone on each channel.
 
 Direct 5.1 needs a shared format that is already six channels. The speaker order is front left, front right, center, subwoofer, surround left, surround right.
 
 ## Download
 
-The current Windows installer is [YouTube Surround 1.2.5](https://github.com/elad0elad/youtube-surround/releases/tag/v1.2.5). Run `YouTube.Surround.Setup.exe`. The guide opens when installation finishes.
+The current Windows installer is [YouTube Surround 1.2.6](https://github.com/elad0elad/youtube-surround/releases/tag/v1.2.6). Run `YouTube.Surround.Setup.exe`. The guide opens when installation finishes.
 
 ## Install from source
 
@@ -96,13 +96,13 @@ YouTube Surround משמיע זרם IAMF אמיתי מ־YouTube ב־Windows. אי
 | Surround Headphones | פלט רב־ערוצי כשההתקן של Windows כבר מקבל שישה ערוצים. |
 | Stereo Headphones | דאוןמיקס ששומר על המרכז, הסראונד והסאב. |
 
-בחלון מופיעים המסלול שבאמת פעיל, שם ההתקן, והודעה ברורה אם המצב שנבחר לא נפתח. חיבור אוזניות או רמקולים בזמן הניגון מעביר את הפלט להתקן החדש. Test Audio משמיע צליל אחד בכל ערוץ.
+בחלון מופיעים המסלול שבאמת פעיל, שם ההתקן, והודעה ברורה אם המצב שנבחר לא נפתח. הניגון עוקב אחרי התקן ההשמעה של Windows. אוזניות שנבחרו רק לשיחות לא לוקחות את הסרט. חיבור אוזניות או רמקולים בזמן הניגון מעביר את הפלט להתקן החדש. Test Audio משמיע צליל אחד בכל ערוץ.
 
 5.1 ישיר דורש פורמט משותף של שישה ערוצים. סדר הרמקולים: קדמי שמאל, קדמי ימין, מרכז, סאב, סראונד שמאל, סראונד ימין.
 
 ## הורדה
 
-קובץ ההתקנה נמצא בשחרור [YouTube Surround 1.2.5](https://github.com/elad0elad/youtube-surround/releases/tag/v1.2.5). מריצים את `YouTube.Surround.Setup.exe`. בסיום נפתחות ההוראות.
+קובץ ההתקנה נמצא בשחרור [YouTube Surround 1.2.6](https://github.com/elad0elad/youtube-surround/releases/tag/v1.2.6). מריצים את `YouTube.Surround.Setup.exe`. בסיום נפתחות ההוראות.
 
 ## התקנה מקוד המקור
 
