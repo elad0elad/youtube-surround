@@ -6,6 +6,7 @@
 //! and does not write a 5.1 file.
 
 mod fmp4;
+mod spatial;
 
 use std::env;
 use std::fs::File;
@@ -25,9 +26,11 @@ fn main() -> ExitCode {
     let mut output = None;
     let mut max_seconds = None;
     let mut follow = false;
+    let mut spatial_out = false;
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--follow" => follow = true,
+            "--spatial" => spatial_out = true,
             "-o" => output = args.next(),
             "--max-seconds" => {
                 max_seconds = args.next().and_then(|v| v.parse::<f64>().ok());
@@ -38,10 +41,12 @@ fn main() -> ExitCode {
             }
             "-h" | "--help" => {
                 eprintln!(
-                    "usage: ys-iamf <input.m4a> -o <output.wav> [--max-seconds N]\n\
-                     ys-iamf --follow - -o <output.wav> [--max-seconds N]\n\
+                    "usage: ys-iamf <input.m4a> -o <output.wav> [--max-seconds N] [--spatial]\n\
+                     ys-iamf --follow - -o <output.wav> [--max-seconds N] [--spatial]\n\
                      Renders IAMF to 6-channel 5.1 PCM (L R C LFE Ls Rs). Fails if the\n\
                      decoder does not produce six channels.\n\
+                     --spatial also writes <output>.ysp from the mix presentation's own\n\
+                     loudspeaker layout and any audio objects. The 5.1 WAV is unchanged.\n\
                      --follow reads a growing MP4 from stdin and writes PCM as fragments arrive."
                 );
                 return ExitCode::SUCCESS;
@@ -65,9 +70,9 @@ fn main() -> ExitCode {
 
     if follow {
         if input == "-" {
-            return follow_stdin(&output, max_seconds);
+            return follow_stdin(&output, max_seconds, spatial_out);
         }
-        return follow_file(&input, &output, max_seconds);
+        return follow_file(&input, &output, max_seconds, spatial_out);
     }
 
     let started = Instant::now();
@@ -133,6 +138,17 @@ fn main() -> ExitCode {
             return ExitCode::from(1);
         }
     };
+    let mut spatial_decoder = if spatial_out {
+        match open_spatial(&track.descriptors, &output) {
+            Ok(decoder) => Some(decoder),
+            Err(err) => {
+                eprintln!("spatial none {err}");
+                None
+            }
+        }
+    } else {
+        None
+    };
 
     let limit_frames = max_seconds.map(|s| (s * f64::from(rate)) as u64);
     let mut written_frames = 0u64;
@@ -148,6 +164,10 @@ fn main() -> ExitCode {
                 let _ = wav.finish();
                 return ExitCode::from(1);
             }
+        }
+        if let Some(spatial) = spatial_decoder.as_mut() {
+            let _ = spatial.decode(&sample.data);
+            pull_spatial(spatial);
         }
         while decoder.is_temporal_unit_available() {
             match decoder.get_output_temporal_unit() {
@@ -193,6 +213,10 @@ fn main() -> ExitCode {
         }
     }
     decoder.signal_end_of_decoding();
+    if let Some(spatial) = spatial_decoder.as_mut() {
+        spatial.signal_end_of_decoding();
+        pull_spatial(spatial);
+    }
     while decoder.is_temporal_unit_available() {
         if limit_frames.is_some_and(|limit| written_frames >= limit) {
             break;
@@ -233,12 +257,13 @@ fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-fn follow_file(path: &str, output: &str, max_seconds: Option<f64>) -> ExitCode {
+fn follow_file(path: &str, output: &str, max_seconds: Option<f64>, spatial_out: bool) -> ExitCode {
     let started = Instant::now();
     let done_path = format!("{path}.done");
     let mut data = Vec::new();
     let mut offset = 0usize;
     let mut decoder: Option<StreamDecoder> = None;
+    let mut spatial_decoder: Option<StreamDecoder> = None;
     let mut wav: Option<WavWriter> = None;
     let mut channels = 0usize;
     let mut rate = 0u32;
@@ -270,6 +295,8 @@ fn follow_file(path: &str, output: &str, max_seconds: Option<f64>) -> ExitCode {
                 &data,
                 &mut offset,
                 &mut decoder,
+                &mut spatial_decoder,
+                spatial_out,
                 &mut wav,
                 output,
                 &mut channels,
@@ -307,6 +334,10 @@ fn follow_file(path: &str, output: &str, max_seconds: Option<f64>) -> ExitCode {
         eprintln!("error: no IAMF sample entry arrived");
         eprintln!("RESULT=NO_IAMF");
         return ExitCode::from(1);
+    }
+    if let Some(spatial) = spatial_decoder.as_mut() {
+        spatial.signal_end_of_decoding();
+        pull_spatial(spatial);
     }
     if let Some(decoder) = decoder.as_mut() {
         decoder.signal_end_of_decoding();
@@ -348,13 +379,14 @@ fn follow_file(path: &str, output: &str, max_seconds: Option<f64>) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-fn follow_stdin(output: &str, max_seconds: Option<f64>) -> ExitCode {
+fn follow_stdin(output: &str, max_seconds: Option<f64>, spatial_out: bool) -> ExitCode {
     let started = Instant::now();
     let mut incoming = std::io::stdin();
     let mut data = Vec::new();
     let mut offset = 0usize;
     let mut chunk = [0u8; 64 * 1024];
     let mut decoder: Option<StreamDecoder> = None;
+    let mut spatial_decoder: Option<StreamDecoder> = None;
     let mut wav: Option<WavWriter> = None;
     let mut channels = 0usize;
     let mut rate = 0u32;
@@ -379,6 +411,8 @@ fn follow_stdin(output: &str, max_seconds: Option<f64>) -> ExitCode {
             &data,
             &mut offset,
             &mut decoder,
+            &mut spatial_decoder,
+            spatial_out,
             &mut wav,
             output,
             &mut channels,
@@ -403,6 +437,10 @@ fn follow_stdin(output: &str, max_seconds: Option<f64>) -> ExitCode {
         eprintln!("error: no IAMF sample entry arrived");
         eprintln!("RESULT=NO_IAMF");
         return ExitCode::from(1);
+    }
+    if let Some(spatial) = spatial_decoder.as_mut() {
+        spatial.signal_end_of_decoding();
+        pull_spatial(spatial);
     }
     if let Some(decoder) = decoder.as_mut() {
         decoder.signal_end_of_decoding();
@@ -441,6 +479,8 @@ fn drain_buffer(
     data: &[u8],
     offset: &mut usize,
     decoder: &mut Option<StreamDecoder>,
+    spatial_decoder: &mut Option<StreamDecoder>,
+    spatial_out: bool,
     wav: &mut Option<WavWriter>,
     output: &str,
     channels: &mut usize,
@@ -486,6 +526,12 @@ fn drain_buffer(
                             return Err(ExitCode::from(1));
                         }
                     }
+                    if spatial_out && spatial_decoder.is_none() {
+                        match open_spatial(&descriptors, output) {
+                            Ok(decoder) => *spatial_decoder = Some(decoder),
+                            Err(err) => eprintln!("spatial none {err}"),
+                        }
+                    }
                 }
                 *offset = end;
             }
@@ -508,6 +554,10 @@ fn drain_buffer(
                             return Err(ExitCode::from(1));
                         }
                     }
+                    if let Some(spatial) = spatial_decoder.as_mut() {
+                        let _ = spatial.decode(&sample.data);
+                        pull_spatial(spatial);
+                    }
                     if let Err(code) = take_output(
                         decoder,
                         wav,
@@ -527,6 +577,33 @@ fn drain_buffer(
                     }
                 }
                 *offset = end;
+            }
+        }
+    }
+}
+
+fn open_spatial(descriptors: &[u8], wav_path: &str) -> Result<StreamDecoder, String> {
+    let target = spatial::presentation_target(descriptors)?;
+    let ysp = std::path::Path::new(wav_path).with_extension("ysp");
+    let factory = spatial::factory(ysp.to_string_lossy().into_owned(), target);
+    let codec = DefaultFactory;
+    let mut settings = StreamSettings::default();
+    settings.layout = Some(target);
+    settings.sample_type = Some(OutputSampleType::Int16LittleEndian);
+    settings.channel_ordering = ChannelOrdering::Iamf;
+    settings.requested_profiles = ProfileSet::all();
+    settings.enable_limiter = false;
+    StreamDecoder::new_from_descriptors_with_renderer(descriptors, settings, &codec, factory)
+        .map_err(|err| err.to_string())
+}
+
+fn pull_spatial(decoder: &mut StreamDecoder) {
+    while decoder.is_temporal_unit_available() {
+        match decoder.get_output_temporal_unit() {
+            Ok(_) => {}
+            Err(err) => {
+                eprintln!("spatial render: {err}");
+                break;
             }
         }
     }

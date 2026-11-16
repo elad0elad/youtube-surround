@@ -75,7 +75,8 @@ function paint(status) {
   const covered = bufferCoversPlayhead();
   const shown = state === "active" && !covered ? "buffering" : state;
   let label = labels[shown] || shown;
-  if (shown === "active" && lastStatus.outputPath === "stereo-downmix") label = "Stereo downmix";
+  if (shown === "active" && (lastStatus.outputPath === "stereo" || lastStatus.outputPath === "stereo-downmix")) label = "Stereo downmix";
+  if (shown === "active" && lastStatus.outputPath === "full-spatial") label = "Full spatial";
   if (shown === "active" && lastStatus.outputPath === "spatial-bed") label = /dolby atmos/i.test(lastStatus.spatialEngine || "") ? "Dolby Atmos" : "Spatial bed";
   if ((shown === "active" || shown === "buffering") && lastStatus.device) label += " · " + lastStatus.device;
   if (wireFailed && state === "active") label += " · refresh the tab";

@@ -84,8 +84,8 @@ function finish(err) {
   if (active.videoId !== "iMrnS6finbA") throw new Error("video id changed");
   send({ type: "clock", videoId: "iMrnS6finbA", time: 30, paused: false, rate: 1 });
   send({ type: "set-output", output: "stereo" });
-  const folded = await waitFor((m) => m.state === "active" && m.videoId === "iMrnS6finbA" && m.channelsOut === 6 && m.rendering === "stereo-downmix" && m.outputPath === "stereo-downmix", 10000);
-  if (folded.layout !== "stereo-downmix") throw new Error("downmix was labeled " + folded.layout);
+  const folded = await waitFor((m) => m.state === "active" && m.videoId === "iMrnS6finbA" && m.channelsOut === 6 && m.rendering === "stereo-downmix" && (m.outputPath === "stereo" || m.outputPath === "stereo-downmix"), 10000);
+  if (folded.layout !== "stereo-downmix" && folded.layout !== "stereo") throw new Error("downmix was labeled " + folded.layout);
   send({ type: "set-output", output: "atmos" });
   const spatial = await waitFor((m) => {
     if (m.outputMode !== "atmos" || m.state !== "active" || m.videoId !== "iMrnS6finbA" || m.channelsOut !== 6) return false;

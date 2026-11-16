@@ -30,9 +30,11 @@ const stateLabels = {
 };
 
 const pathLabels = {
+  "full-spatial": "Full spatial",
   "discrete-5.1": "Direct 5.1",
   "spatial-bed": "Spatial 5.1 bed",
-  "stereo-downmix": "Stereo downmix"
+  "stereo": "Stereo",
+  "stereo-downmix": "Stereo"
 };
 
 function render(status) {
@@ -47,7 +49,7 @@ function render(status) {
   const route = [];
   if (status.device) route.push(status.device);
   if (status.renderChannels) route.push(status.renderChannels + " ch");
-  if (status.outputPath === "spatial-bed") route.push(status.spatialEngine || "Windows Spatial Audio");
+  if (status.outputPath === "spatial-bed" || status.outputPath === "full-spatial") route.push(status.spatialEngine || "Windows Spatial Audio");
   document.getElementById("route").textContent = route.join(" · ");
   document.getElementById("outputError").textContent = status.outputError || "";
   document.getElementById("detail").textContent = status.detail || "";

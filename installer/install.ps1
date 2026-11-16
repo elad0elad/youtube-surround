@@ -33,7 +33,7 @@ function Remove-Registration {
 function Remove-PlaybackTemps {
     $temp = [System.IO.Path]::GetTempPath()
     Get-ChildItem -LiteralPath $temp -Force -ErrorAction SilentlyContinue | Where-Object {
-        $_.Name -match '^ys-[0-9a-fA-F]{32}\.(m4a|wav|m4a\.done|m4a\.part)$'
+        $_.Name -match '^ys-[0-9a-fA-F]{32}\.(m4a|wav|ysp|m4a\.done|m4a\.part)$'
     } | ForEach-Object {
         try { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop } catch {}
     }

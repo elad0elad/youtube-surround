@@ -12,9 +12,9 @@ Choose the output in the extension popup. The choice is saved.
 
 | Choice | What plays |
 | --- | --- |
-| Auto Detect | The default Windows device is measured. Six channels use direct 5.1. Otherwise an active Windows Spatial Audio stream gets a 5.1 bed. Otherwise the audio is downmixed to stereo. |
+| Auto Detect | The default Windows device is measured. Six channels use direct 5.1. A spatial device plays the mix presentation's own layout, including height channels and audio objects when the IAMF presentation has them. A presentation with only a 5.1 layout stays a 5.1 spatial bed. Otherwise the audio is downmixed to stereo. |
 | 5.1 Speakers | Six discrete channels: front left, front right, center, LFE, surround left, surround right. |
-| Dolby Atmos Headphones | The 5.1 mix stays on Dolby Atmos for Headphones when that is the Windows spatial format. It does not fall back to a stereo downmix. |
+| Dolby Atmos Headphones | The IAMF mix stays on Dolby Atmos for Headphones when that is the Windows spatial format. Height channels and audio objects are included when the presentation has them. A 5.1 presentation stays a 5.1 bed. It does not fall back to a stereo downmix. |
 | Surround Headphones | Direct multichannel audio when the Windows device is already accepting six channels. |
 | Stereo Headphones | A downmix that keeps the center, the surrounds, and the LFE. |
 
@@ -24,7 +24,7 @@ Direct 5.1 needs a shared format that is already six channels. The speaker order
 
 ## Download
 
-The current Windows installer is [YouTube Surround 1.2.6](https://github.com/elad0elad/youtube-surround/releases/tag/v1.2.6). Run `YouTube.Surround.Setup.exe`. The guide opens when installation finishes.
+The current Windows installer is [YouTube Surround 1.3.0](https://github.com/elad0elad/youtube-surround/releases/tag/v1.3.0). Run `YouTube.Surround.Setup.exe`. The guide opens when installation finishes.
 
 ## Install from source
 
@@ -90,9 +90,9 @@ YouTube Surround משמיע זרם IAMF אמיתי מ־YouTube ב־Windows. אי
 
 | בחירה | מה מתנגן |
 | --- | --- |
-| Auto Detect | נבדק התקן ברירת המחדל. שישה ערוצים יוצאים כ־5.1 ישיר. אם Spatial Audio פעיל, נשלחת מיטת 5.1. אחרת מתנגן דאוןמיקס לסטריאו. |
+| Auto Detect | נבדק התקן ברירת המחדל. שישה ערוצים יוצאים כ־5.1 ישיר. בהתקן מרחבי מתנגנת הפריסה שהמצגת עצמה מצהירה עליה, כולל ערוצי גובה ואובייקטים כשהם קיימים. מצגת של 5.1 בלבד נשארת מיטת 5.1. אחרת מתנגן דאוןמיקס לסטריאו. |
 | 5.1 Speakers | שישה ערוצים נפרדים: קדמי שמאל, קדמי ימין, מרכז, סאב, סראונד שמאל, סראונד ימין. |
-| Dolby Atmos Headphones | המיקס של 5.1 נשאר על Dolby Atmos for Headphones כשזה פורמט הסאונד המרחבי של Windows, בלי נפילה לדאוןמיקס. |
+| Dolby Atmos Headphones | המיקס של IAMF נשאר על Dolby Atmos for Headphones כשזה פורמט הסאונד המרחבי של Windows. ערוצי גובה ואובייקטים נכללים כשהמצגת מכילה אותם. מצגת 5.1 נשארת מיטת 5.1, בלי נפילה לדאוןמיקס. |
 | Surround Headphones | פלט רב־ערוצי כשההתקן של Windows כבר מקבל שישה ערוצים. |
 | Stereo Headphones | דאוןמיקס ששומר על המרכז, הסראונד והסאב. |
 
@@ -102,7 +102,7 @@ YouTube Surround משמיע זרם IAMF אמיתי מ־YouTube ב־Windows. אי
 
 ## הורדה
 
-קובץ ההתקנה נמצא בשחרור [YouTube Surround 1.2.6](https://github.com/elad0elad/youtube-surround/releases/tag/v1.2.6). מריצים את `YouTube.Surround.Setup.exe`. בסיום נפתחות ההוראות.
+קובץ ההתקנה נמצא בשחרור [YouTube Surround 1.3.0](https://github.com/elad0elad/youtube-surround/releases/tag/v1.3.0). מריצים את `YouTube.Surround.Setup.exe`. בסיום נפתחות ההוראות.
 
 ## התקנה מקוד המקור
 

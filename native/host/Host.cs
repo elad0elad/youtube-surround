@@ -48,6 +48,11 @@ internal static class Host
     private static string OutputError = "";
     private static string SpatialEngine = "";
     private static bool SpatialAvailable;
+    private static string SpatialPath;
+    private static string SpatialLabel = "";
+    private static int SpatialBeds;
+    private static int SpatialHeights;
+    private static int SpatialObjects;
     private static int RenderChannels;
     private static volatile int OutputGeneration;
     private static int DeviceGeneration;
@@ -71,6 +76,7 @@ internal static class Host
             if (args.Length > 0 && args[0] == "probe") return Probe(args);
             if (args.Length > 0 && args[0] == "downmix-check") return DownmixCheck();
             if (args.Length > 0 && args[0] == "render-check") return RenderCheck(args);
+            if (args.Length > 0 && args[0] == "spatial-render") return SpatialRender(args);
             return NativeLoop();
         }
         catch (Exception ex)
@@ -286,6 +292,12 @@ internal static class Host
             + " --extractor-args " + Q("youtube:player_client=tv_samsung")
             + " -f 773 -o " + Q(m4a) + " " + Q(url);
         string decArgs = "--follow " + Q(m4a) + " -o " + Q(wav);
+        if (OutputPath == "spatial-bed" || OutputPath == "full-spatial") decArgs += " --spatial";
+        SpatialPath = null;
+        SpatialBeds = 0;
+        SpatialHeights = 0;
+        SpatialObjects = 0;
+        SpatialLabel = "";
         Log("stream " + url);
         var downloadNotes = new StringBuilder();
         Process download = StartTool(ytdlp, dlArgs);
@@ -322,6 +334,23 @@ internal static class Host
                 State = "decoding";
                 Detail = "Decoding IAMF as it downloads.";
                 Publish();
+            }
+            else if (line.StartsWith("spatial "))
+            {
+                var bed = Regex.Match(line, @"bed=(\d+)");
+                var heights = Regex.Match(line, @"heights=(\d+)");
+                var objects = Regex.Match(line, @"objects=(\d+)");
+                var name = Regex.Match(line, @"name=(\S+)");
+                SpatialBeds = bed.Success ? int.Parse(bed.Groups[1].Value) : 0;
+                SpatialHeights = heights.Success ? int.Parse(heights.Groups[1].Value) : 0;
+                SpatialObjects = objects.Success ? int.Parse(objects.Groups[1].Value) : 0;
+                SpatialLabel = name.Success ? name.Groups[1].Value : "";
+                if ((SpatialHeights > 0 || SpatialObjects > 0) && !line.StartsWith("spatial none"))
+                {
+                    SpatialPath = Path.ChangeExtension(wav, ".ysp");
+                    if (OutputPath == "spatial-bed") OutputPath = "full-spatial";
+                    Log("spatial source " + SpatialLabel + " bed=" + SpatialBeds + " heights=" + SpatialHeights + " objects=" + SpatialObjects);
+                }
             }
             else if (line.StartsWith("ready ") || line.StartsWith("progress "))
             {
@@ -512,6 +541,25 @@ internal static class Host
 
     private static void PlayWavFollowClock(string path, Clock initial, double stopAt)
     {
+        if (OutputPath == "full-spatial")
+        {
+            try
+            {
+                if (PlayFullSpatial(stopAt)) return;
+            }
+            catch (Exception ex)
+            {
+                if (IsTransient(ex)) throw;
+                Log("full spatial fallback " + ex.Message);
+            }
+            lock (Gate)
+            {
+                OutputPath = "spatial-bed";
+                OutputError = "";
+                Detail = PlayingDetail(true);
+            }
+            Publish();
+        }
         if (OutputPath == "spatial-bed")
         {
             try
@@ -776,6 +824,9 @@ internal static class Host
         TryDelete(m4a);
         if (!string.IsNullOrEmpty(m4a)) TryDelete(m4a + ".done");
         TryDelete(wav);
+        if (!string.IsNullOrEmpty(wav)) TryDelete(Path.ChangeExtension(wav, ".ysp"));
+        TryDelete(SpatialPath);
+        SpatialPath = null;
     }
 
     private static void KillTree(Process process)
@@ -853,7 +904,7 @@ internal static class Host
             { "sourceCodec", OutputChannels == 6 ? "iamf.001.001.Opus" : "" },
             { "layout", LayoutName() },
             { "outputMode", OutputPreference },
-            { "outputPath", OutputPath ?? "" },
+            { "outputPath", OutputPath == "stereo-downmix" ? "stereo" : (OutputPath ?? "") },
             { "rendering", Rendering ?? "" },
             { "spatialAvailable", SpatialAvailable },
             { "spatialEngine", SpatialEngine ?? "" },
@@ -929,6 +980,8 @@ internal static class Host
                 OutputPath = "stereo-downmix";
                 RenderChannels = 2;
             }
+            if (OutputPath == "spatial-bed" && (SpatialHeights > 0 || SpatialObjects > 0))
+                OutputPath = "full-spatial";
             Log("route " + OutputPreference + " -> " + OutputPath + " device=" + DeviceName + " ch=" + DeviceChannels + " engine=" + SpatialEngine);
         }
         catch (Exception ex)
@@ -951,6 +1004,13 @@ internal static class Host
     {
         string tail = downloading ? " The rest of the audio is still downloading." : " YouTube's stereo track is muted.";
         string err = string.IsNullOrEmpty(OutputError) ? "" : " " + OutputError;
+        if (OutputPath == "full-spatial")
+        {
+            string engine = string.IsNullOrEmpty(SpatialEngine) ? "Windows Spatial Audio" : SpatialEngine;
+            string mix = string.IsNullOrEmpty(SpatialLabel) ? "spatial" : SpatialLabel;
+            string objects = SpatialObjects > 0 ? " and " + SpatialObjects + " audio objects" : "";
+            return engine + " is playing the IAMF " + mix + " mix" + objects + " on " + DeviceName + "." + tail + err;
+        }
         if (OutputPath == "discrete-5.1") return "Direct 5.1 is playing on " + DeviceName + "." + tail + err;
         if (OutputPath == "spatial-bed")
         {
@@ -965,6 +1025,7 @@ internal static class Host
     private static string LayoutName()
     {
         if (OutputChannels != 6) return "";
+        if (OutputPath == "full-spatial") return "full-spatial";
         if (OutputPath == "discrete-5.1") return "5.1";
         if (OutputPath == "spatial-bed") return "spatial-bed";
         if (OutputPath == "stereo-downmix") return "stereo-downmix";
@@ -1095,6 +1156,7 @@ internal static class Host
         if (Rendering == "discrete-5.1") result = "DISCRETE_RENDERED";
         else if (Rendering == "spatial-bed") result = "SPATIAL_RENDERED";
         else if (Rendering == "stereo-downmix") result = "DOWNMIX_RENDERED";
+        if (Rendering == "full-spatial") result = "FULL_SPATIAL_RENDERED";
         Console.WriteLine("RESULT=" + result);
         return Rendering == planned && planned.Length > 0 ? 0 : 2;
     }
@@ -1314,6 +1376,434 @@ internal static class Host
         uint lfe = (native & low) != 0 ? low : 0;
         if (left == 0 || right == 0 || center == 0 || lfe == 0) return null;
         return new uint[] { frontLeft, frontRight, center, lfe, left, right };
+    }
+
+    private static int SpatialRender(string[] args)
+    {
+        if (args.Length < 2)
+        {
+            Console.WriteLine("RESULT=FULL_SPATIAL_FAILED missing file");
+            return 2;
+        }
+        OutputPreference = "auto";
+        ResolveRoute();
+        SpatialPath = args[1];
+        double seconds = 2;
+        if (args.Length > 2) double.TryParse(args[2], NumberStyles.Float, CultureInfo.InvariantCulture, out seconds);
+        if (seconds < 0.2) seconds = 0.2;
+        if (seconds > 5) seconds = 5;
+        State = "active";
+        lock (Gate) { ClockNow = new Clock { Time = 0, Rate = 1, Paused = false, Mono = Stopwatch.GetTimestamp() }; }
+        bool played = false;
+        try { played = PlayFullSpatial(seconds); }
+        catch (Exception ex)
+        {
+            Log("spatial-render " + ex.Message);
+            Console.WriteLine(ex.Message);
+        }
+        Console.WriteLine("path=" + OutputPath);
+        Console.WriteLine("rendering=" + Rendering);
+        Console.WriteLine("renderChannels=" + RenderChannels);
+        Console.WriteLine("engine=" + SpatialEngine);
+        Console.WriteLine(played && Rendering == "full-spatial" ? "RESULT=FULL_SPATIAL_RENDERED" : "RESULT=FULL_SPATIAL_FAILED");
+        return played && Rendering == "full-spatial" ? 0 : 1;
+    }
+
+    private static void IamfToWindows(float azimuth, float elevation, float distance, out float x, out float y, out float z)
+    {
+        double az = azimuth * Math.PI / 180.0;
+        double el = elevation * Math.PI / 180.0;
+        double cosEl = Math.Cos(el);
+        double right = -cosEl * Math.Sin(az);
+        double front = cosEl * Math.Cos(az);
+        double up = Math.Sin(el);
+        float radius = distance;
+        if (radius < 0) radius = 0;
+        if (radius > 1) radius = 1;
+        x = (float)(right * radius);
+        y = (float)(up * radius);
+        z = (float)(-front * radius);
+    }
+
+    private sealed class SpatialSlot
+    {
+        public uint Type;
+        public bool Dynamic;
+        public bool Object;
+        public bool Height;
+        public int Source;
+        public float Az;
+        public float El;
+        public float Dist;
+        public bool Positioned;
+        public ISpatialAudioObject Node;
+    }
+
+    private sealed class SpatialCursor
+    {
+        public FileStream Stream;
+        public int Header;
+        public int Beds;
+        public int Objects;
+        public long Origin;
+        public int Frames;
+        public float[][] Bed;
+        public float[][] Obj;
+        public float[] Az;
+        public float[] El;
+        public float[] Dist;
+        public byte[] Valid;
+        public bool Contains(long frame)
+        {
+            return Frames > 0 && frame >= Origin && frame < Origin + Frames;
+        }
+        public bool Load(long frame)
+        {
+            if (Contains(frame)) return true;
+            if (Frames > 0 && frame >= Origin + Frames)
+            {
+                while (frame >= Origin + Frames)
+                {
+                    if (!ReadChunk()) return false;
+                }
+                return Contains(frame);
+            }
+            Stream.Position = Header;
+            Origin = 0;
+            Frames = 0;
+            while (frame >= Origin + Frames)
+            {
+                long at = Origin + Frames;
+                if (!ReadChunk()) return false;
+                if (Origin + Frames <= at) return false;
+            }
+            return Contains(frame);
+        }
+        bool ReadChunk()
+        {
+            long pos = Stream.Position;
+            if (Stream.Length < pos + 4) return false;
+            byte[] head = new byte[4];
+            if (Stream.Read(head, 0, 4) != 4) { Stream.Position = pos; return false; }
+            int frames = BitConverter.ToInt32(head, 0);
+            if (frames <= 0 || frames > 8192) { Stream.Position = pos; return false; }
+            int bytes = frames * Beds * 2 + Objects * (13 + frames * 2);
+            if (Stream.Length < Stream.Position + bytes) { Stream.Position = pos; return false; }
+            long start = Origin + Frames;
+            float[][] bed = new float[Beds][];
+            byte[] pcm = new byte[frames * Beds * 2];
+            if (pcm.Length > 0 && Stream.Read(pcm, 0, pcm.Length) != pcm.Length) { Stream.Position = pos; return false; }
+            for (int c = 0; c < Beds; c++) bed[c] = new float[frames];
+            for (int i = 0; i < frames; i++)
+            {
+                for (int c = 0; c < Beds; c++)
+                    bed[c][i] = BitConverter.ToInt16(pcm, (i * Beds + c) * 2) / 32768f;
+            }
+            float[] az = new float[Objects];
+            float[] el = new float[Objects];
+            float[] dist = new float[Objects];
+            byte[] valid = new byte[Objects];
+            float[][] obj = new float[Objects][];
+            byte[] one = new byte[13];
+            for (int o = 0; o < Objects; o++)
+            {
+                if (Stream.Read(one, 0, 13) != 13) { Stream.Position = pos; return false; }
+                az[o] = BitConverter.ToSingle(one, 0);
+                el[o] = BitConverter.ToSingle(one, 4);
+                dist[o] = BitConverter.ToSingle(one, 8);
+                valid[o] = one[12];
+                byte[] samples = new byte[frames * 2];
+                if (Stream.Read(samples, 0, samples.Length) != samples.Length) { Stream.Position = pos; return false; }
+                obj[o] = new float[frames];
+                if (valid[o] == 1)
+                {
+                    for (int i = 0; i < frames; i++)
+                        obj[o][i] = BitConverter.ToInt16(samples, i * 2) / 32768f;
+                }
+            }
+            Origin = start;
+            Frames = frames;
+            Bed = bed;
+            Obj = obj;
+            Az = az;
+            El = el;
+            Dist = dist;
+            Valid = valid;
+            return true;
+        }
+    }
+
+    private static bool PlayFullSpatial(double stopAt)
+    {
+        string ysp = SpatialPath;
+        if (string.IsNullOrEmpty(ysp) || !File.Exists(ysp)) return false;
+        var cursor = new SpatialCursor();
+        IMMDevice dev = null;
+        ISpatialAudioClient client = null;
+        ISpatialAudioObjectRenderStream stream = null;
+        IntPtr fmtPtr = IntPtr.Zero;
+        IntPtr actPtr = IntPtr.Zero;
+        IntPtr evt = IntPtr.Zero;
+        IntPtr mmcss = IntPtr.Zero;
+        var slots = new List<SpatialSlot>();
+        try
+        {
+            cursor.Stream = new FileStream(ysp, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            byte[] magic = new byte[4];
+            if (cursor.Stream.Read(magic, 0, 4) != 4 || magic[0] != (byte)'Y' || magic[1] != (byte)'S') return false;
+            byte[] hdr = new byte[12];
+            if (cursor.Stream.Read(hdr, 0, 12) != 12) return false;
+            int version = BitConverter.ToUInt16(hdr, 0);
+            int rate = BitConverter.ToInt32(hdr, 2);
+            cursor.Beds = BitConverter.ToUInt16(hdr, 6);
+            cursor.Objects = BitConverter.ToUInt16(hdr, 8);
+            int heights = BitConverter.ToUInt16(hdr, 10);
+            if (version != 1 || rate != 48000) return false;
+            if (heights <= 0 && cursor.Objects <= 0) return false;
+            var kind = new uint[cursor.Beds];
+            var az = new float[cursor.Beds];
+            var el = new float[cursor.Beds];
+            var dist = new float[cursor.Beds];
+            var lfe = new bool[cursor.Beds];
+            byte[] rec = new byte[17];
+            for (int i = 0; i < cursor.Beds; i++)
+            {
+                if (cursor.Stream.Read(rec, 0, 17) != 17) return false;
+                kind[i] = BitConverter.ToUInt32(rec, 0);
+                az[i] = BitConverter.ToSingle(rec, 4);
+                el[i] = BitConverter.ToSingle(rec, 8);
+                dist[i] = BitConverter.ToSingle(rec, 12);
+                lfe[i] = rec[16] != 0;
+            }
+            cursor.Header = (int)cursor.Stream.Position;
+            dev = PickDevice();
+            DeviceName = ReadName(dev);
+            string openedId = ReadId(dev);
+            client = ActivateSpatial(dev);
+            Guid streamId = new Guid("BAB5F473-B423-477B-85F5-B5A332A04153");
+            if (client.IsSpatialAudioStreamAvailable(ref streamId, IntPtr.Zero) != 0) return false;
+            uint native;
+            Marshal.ThrowExceptionForHR(client.GetNativeStaticObjectTypeMask(out native));
+            uint maxDynamic;
+            Marshal.ThrowExceptionForHR(client.GetMaxDynamicObjectCount(out maxDynamic));
+            int dynamics = 0;
+            for (int i = 0; i < cursor.Beds; i++)
+            {
+                bool height = !lfe[i] && Math.Abs(el[i]) >= 20f;
+                var slot = new SpatialSlot();
+                slot.Source = i;
+                slot.Height = height;
+                slot.Az = az[i];
+                slot.El = el[i];
+                slot.Dist = dist[i];
+                slot.Positioned = true;
+                if (kind[i] != 1 && (native & kind[i]) != 0)
+                {
+                    slot.Type = kind[i];
+                    slots.Add(slot);
+                }
+                else if (dynamics < (int)maxDynamic)
+                {
+                    slot.Type = 1;
+                    slot.Dynamic = true;
+                    slots.Add(slot);
+                    dynamics++;
+                }
+                else Log("spatial dropped bed channel " + i);
+            }
+            for (int i = 0; i < cursor.Objects; i++)
+            {
+                if (dynamics >= (int)maxDynamic)
+                {
+                    Log("spatial dropped audio object " + i);
+                    continue;
+                }
+                var slot = new SpatialSlot();
+                slot.Type = 1;
+                slot.Dynamic = true;
+                slot.Object = true;
+                slot.Source = i;
+                slots.Add(slot);
+                dynamics++;
+            }
+            bool full = false;
+            for (int i = 0; i < slots.Count; i++)
+                if (slots[i].Height || slots[i].Object) full = true;
+            if (!full) return false;
+            var wave = new PcmWave();
+            wave.Tag = 3;
+            wave.Channels = 1;
+            wave.Rate = 48000;
+            wave.Avg = 192000;
+            wave.Align = 4;
+            wave.Bits = 32;
+            fmtPtr = Marshal.AllocCoTaskMem(Marshal.SizeOf(typeof(PcmWave)));
+            Marshal.StructureToPtr(wave, fmtPtr, false);
+            if (client.IsAudioObjectFormatSupported(fmtPtr) != 0) return false;
+            evt = CreateEvent(IntPtr.Zero, false, false, null);
+            if (evt == IntPtr.Zero) return false;
+            uint mask = 0;
+            for (int i = 0; i < slots.Count; i++) if (!slots[i].Dynamic) mask |= slots[i].Type;
+            actPtr = Marshal.AllocCoTaskMem(40);
+            for (int i = 0; i < 40; i++) Marshal.WriteByte(actPtr, i, 0);
+            Marshal.WriteIntPtr(actPtr, 0, fmtPtr);
+            Marshal.WriteInt32(actPtr, 8, unchecked((int)mask));
+            Marshal.WriteInt32(actPtr, 12, 0);
+            Marshal.WriteInt32(actPtr, 16, dynamics);
+            Marshal.WriteInt32(actPtr, 20, 11);
+            Marshal.WriteIntPtr(actPtr, 24, evt);
+            var blob = new PropVariantBlob();
+            blob.vt = 65;
+            blob.size = 40;
+            blob.data = actPtr;
+            IntPtr streamPtr;
+            int hr = client.ActivateSpatialAudioStream(ref blob, ref streamId, out streamPtr);
+            if (hr != 0 || streamPtr == IntPtr.Zero) throw new InvalidOperationException("ActivateSpatialAudioStream failed (0x" + hr.ToString("X8") + ")");
+            stream = (ISpatialAudioObjectRenderStream)Marshal.GetObjectForIUnknown(streamPtr);
+            Marshal.Release(streamPtr);
+            for (int i = 0; i < slots.Count; i++)
+            {
+                IntPtr obj;
+                hr = stream.ActivateSpatialAudioObject(slots[i].Type, out obj);
+                if (hr != 0 || obj == IntPtr.Zero) throw new InvalidOperationException("spatial object failed (0x" + hr.ToString("X8") + ")");
+                slots[i].Node = (ISpatialAudioObject)Marshal.GetObjectForIUnknown(obj);
+                Marshal.Release(obj);
+            }
+            Marshal.ThrowExceptionForHR(stream.Start());
+            Rendering = "full-spatial";
+            OutputPath = "full-spatial";
+            RenderChannels = slots.Count;
+            SampleRate = rate;
+            if (State == "unavailable" || State == "active")
+            {
+                State = "active";
+                Detail = PlayingDetail(true);
+            }
+            Publish();
+            Log("full spatial static=" + (slots.Count - dynamics) + " dynamic=" + dynamics + " heights=" + heights + " objects=" + cursor.Objects);
+            uint mmTask = 0;
+            mmcss = AvSetMmThreadCharacteristics("Pro Audio", ref mmTask);
+            int count = 480;
+            float[][] planes = new float[slots.Count][];
+            for (int i = 0; i < slots.Count; i++) planes[i] = new float[count];
+            long playCursor = -1;
+            bool primed = false;
+            int generation = OutputGeneration;
+            int updates = 0;
+            int dropouts = 0;
+            while (Running && OutputGeneration == generation)
+            {
+                if (!primed)
+                {
+                    Clock ahead;
+                    lock (Gate) ahead = ClockNow;
+                    double step = ahead.Rate <= 0 ? 1 : ahead.Rate;
+                    double target = (ahead.MediaSeconds() + 0.02) * rate;
+                    if (target < 0) target = 0;
+                    if (ahead.Paused) playCursor = (long)target;
+                    else if (playCursor < 0 || Math.Abs(step - 1.0) >= 0.001 || Math.Abs(playCursor - target) > rate * 0.12)
+                        playCursor = (long)target;
+                    float gain = OutputMilli / 1000f;
+                    for (int s = 0; s < slots.Count; s++)
+                    {
+                        Array.Clear(planes[s], 0, count);
+                        SpatialSlot slot = slots[s];
+                        if (!ahead.Paused && playCursor >= 0 && cursor.Load(playCursor))
+                        {
+                            bool positioned = true;
+                            if (slot.Object)
+                            {
+                                positioned = cursor.Valid != null && slot.Source < cursor.Valid.Length && cursor.Valid[slot.Source] == 1;
+                                if (positioned)
+                                {
+                                    slot.Az = cursor.Az[slot.Source];
+                                    slot.El = cursor.El[slot.Source];
+                                    slot.Dist = cursor.Dist[slot.Source];
+                                }
+                            }
+                            slot.Positioned = positioned;
+                            if (positioned)
+                            {
+                                for (int i = 0; i < count; i++)
+                                {
+                                    long at = playCursor + i;
+                                    if (!cursor.Load(at)) break;
+                                    int local = (int)(at - cursor.Origin);
+                                    if (local < 0 || local >= cursor.Frames) break;
+                                    float sample = slot.Object ? cursor.Obj[slot.Source][local] : cursor.Bed[slot.Source][local];
+                                    planes[s][i] = sample * gain;
+                                }
+                            }
+                        }
+                    }
+                    primed = true;
+                }
+                uint waited = WaitForSingleObject(evt, 50);
+                if (waited == 0)
+                {
+                    uint dynamicCount, frameCount;
+                    hr = stream.BeginUpdatingAudioObjects(out dynamicCount, out frameCount);
+                    if (hr == unchecked((int)0x88890101)) { }
+                    else if (hr == unchecked((int)0x88890100) || hr == unchecked((int)0x88890102)) throw new InvalidOperationException("device changed");
+                    else if (hr != 0)
+                    {
+                        dropouts++;
+                        if (dropouts == 1 || dropouts == 40) Log("full spatial begin 0x" + hr.ToString("X8") + " missed=" + dropouts);
+                        if (dropouts >= 40) throw new InvalidOperationException("spatial update failed (0x" + hr.ToString("X8") + ")");
+                    }
+                    else
+                    {
+                        dropouts = 0;
+                        updates++;
+                        try
+                        {
+                            int samples = (int)frameCount;
+                            if (samples > count) samples = count;
+                            for (int s = 0; s < slots.Count; s++)
+                            {
+                                if (slots[s].Node == null) continue;
+                                if (slots[s].Dynamic && slots[s].Positioned)
+                                {
+                                    float x, y, z;
+                                    IamfToWindows(slots[s].Az, slots[s].El, slots[s].Dist, out x, out y, out z);
+                                    slots[s].Node.SetPosition(x, y, z);
+                                }
+                                IntPtr buffer;
+                                uint length;
+                                if (slots[s].Node.GetBuffer(out buffer, out length) != 0 || buffer == IntPtr.Zero) continue;
+                                int n = (int)(length / 4);
+                                if (n > samples) n = samples;
+                                if (n > 0) Marshal.Copy(planes[s], 0, buffer, n);
+                            }
+                        }
+                        finally { stream.EndUpdatingAudioObjects(); }
+                        if (playCursor >= 0) playCursor += frameCount;
+                        primed = false;
+                    }
+                }
+                string preferredNow;
+                lock (DeviceLock) preferredNow = PreferredId;
+                if (!string.IsNullOrEmpty(preferredNow) && !string.Equals(preferredNow, openedId, StringComparison.OrdinalIgnoreCase)) return true;
+                Clock clock;
+                lock (Gate) clock = ClockNow;
+                if (stopAt > 0 && clock.MediaSeconds() >= stopAt) break;
+            }
+            Log("full spatial updates=" + updates + " missed=" + dropouts);
+            try { stream.Stop(); } catch { }
+            return updates > 0;
+        }
+        finally
+        {
+            if (mmcss != IntPtr.Zero) AvRevertMmThreadCharacteristics(mmcss);
+            for (int i = 0; i < slots.Count; i++) if (slots[i].Node != null) Marshal.ReleaseComObject(slots[i].Node);
+            if (stream != null) Marshal.ReleaseComObject(stream);
+            if (client != null) Marshal.ReleaseComObject(client);
+            if (dev != null) Marshal.ReleaseComObject(dev);
+            if (fmtPtr != IntPtr.Zero) Marshal.FreeCoTaskMem(fmtPtr);
+            if (actPtr != IntPtr.Zero) Marshal.FreeCoTaskMem(actPtr);
+            if (evt != IntPtr.Zero) CloseHandle(evt);
+            if (cursor.Stream != null) cursor.Stream.Dispose();
+        }
     }
 
     private static void PlaySpatial(string path, double stopAt)

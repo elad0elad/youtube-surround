@@ -41,4 +41,5 @@ version = "0.1.0"
 dependencies = [
  "iamf-codecs",
  "iamf-dec",
+ "iamf-obu",
 ]

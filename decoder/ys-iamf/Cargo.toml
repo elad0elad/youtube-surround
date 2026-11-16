@@ -8,5 +8,6 @@ license = "MIT"
 publish = false
 
 [dependencies]
-iamf-codecs = { path = "../../third_party/iamf-rs/crates/iamf-codecs", default-features = false, features = ["opus-ffi"] }
+iamf-codecs = { path = "../../third_party/iamf-rs/crates/iamf-codecs", default-features = false, features = ["opus-ffi", "pcm"] }
 iamf-dec = { path = "../../third_party/iamf-rs/crates/iamf-dec", default-features = false }
+iamf-obu = { path = "../../third_party/iamf-rs/crates/iamf-obu" }
