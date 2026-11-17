@@ -76,8 +76,12 @@ function paint(status) {
   const shown = state === "active" && !covered ? "buffering" : state;
   let label = labels[shown] || shown;
   if (shown === "active" && (lastStatus.outputPath === "stereo" || lastStatus.outputPath === "stereo-downmix")) label = "Stereo downmix";
-  if (shown === "active" && lastStatus.outputPath === "full-spatial") label = "Full spatial";
-  if (shown === "active" && lastStatus.outputPath === "spatial-bed") label = /dolby atmos/i.test(lastStatus.spatialEngine || "") ? "Dolby Atmos" : "Spatial bed";
+  if (shown === "active" && lastStatus.outputPath === "discrete-5.1") label = "Direct 5.1";
+  if (shown === "active" && lastStatus.outputPath === "full-spatial") {
+    label = "Full spatial";
+    if (lastStatus.sourceLayout) label += " · " + lastStatus.sourceLayout;
+  }
+  if (shown === "active" && lastStatus.outputPath === "spatial-bed") label = "Spatial bed";
   if ((shown === "active" || shown === "buffering") && lastStatus.device) label += " · " + lastStatus.device;
   if (wireFailed && state === "active") label += " · refresh the tab";
   badge.textContent = label + (state === "error" && lastStatus.detail ? " — " + lastStatus.detail : "");
@@ -210,6 +214,7 @@ document.addEventListener("yt-navigate-finish", () => {
 });
 
 document.addEventListener("visibilitychange", () => {
+  sendClock();
   if (document.visibilityState === "visible") {
     watchSent = false;
     scan();

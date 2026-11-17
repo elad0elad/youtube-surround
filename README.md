@@ -12,19 +12,21 @@ Choose the output in the extension popup. The choice is saved.
 
 | Choice | What plays |
 | --- | --- |
-| Auto Detect | The default Windows device is measured. Six channels use direct 5.1. A spatial device plays the mix presentation's own layout, including height channels and audio objects when the IAMF presentation has them. A presentation with only a 5.1 layout stays a 5.1 spatial bed. Otherwise the audio is downmixed to stereo. |
+| Auto Detect | Follows the Windows playback device. Six-channel speakers play direct 5.1. Spatial headphones play the video's own IAMF mix. Stereo is used when the video or the device has nothing else. |
 | 5.1 Speakers | Six discrete channels: front left, front right, center, LFE, surround left, surround right. |
-| Dolby Atmos Headphones | The IAMF mix stays on Dolby Atmos for Headphones when that is the Windows spatial format. Height channels and audio objects are included when the presentation has them. A 5.1 presentation stays a 5.1 bed. It does not fall back to a stereo downmix. |
-| Surround Headphones | Direct multichannel audio when the Windows device is already accepting six channels. |
+| Dolby Atmos Headphones | Plays the IAMF mix through Dolby Atmos for Headphones when Windows is using that format. |
+| Surround Headphones | Multichannel audio when Windows is already set to six channels. |
 | Stereo Headphones | A downmix that keeps the center, the surrounds, and the LFE. |
 
-The popup shows the route that is actually playing, the device name, and a plain error when the selected mode cannot be opened. Playback follows the Windows playback device. A headset selected only for calls does not take the movie. Connecting headphones or speakers during playback switches the output to that device. Test Audio plays one tone on each channel.
+The player shows what is actually playing: **Full spatial**, **Spatial bed**, **Direct 5.1**, or **Stereo**, together with the device name. Full spatial means the video's height channels and moving audio objects are playing. Spatial bed means the 5.1 mix is playing. If the selected mode cannot be opened, the popup says so.
+
+Connecting headphones or speakers during a video switches the output to the new playback device, including when the video started on speakers. A headset selected only for calls does not take the movie. Test Audio plays one tone on each channel.
 
 Direct 5.1 needs a shared format that is already six channels. The speaker order is front left, front right, center, subwoofer, surround left, surround right.
 
 ## Download
 
-The current Windows installer is [YouTube Surround 1.3.0](https://github.com/elad0elad/youtube-surround/releases/tag/v1.3.0). Run `YouTube.Surround.Setup.exe`. The guide opens when installation finishes.
+The current Windows installer is [YouTube Surround 1.4.0](https://github.com/elad0elad/youtube-surround/releases/tag/v1.4.0). Run `YouTube.Surround.Setup.exe`. The guide opens when installation finishes.
 
 ## Install from source
 
@@ -52,7 +54,7 @@ Run `installer\uninstall.cmd`, then remove YouTube Surround from the browser's e
 
 - Not every video has an IAMF stream. YouTube can change or remove it.
 - Seeking past the downloaded part plays YouTube's stereo until the external audio catches up.
-- Headphones whose Windows spatial format is Dolby Atmos for Headphones keep the 5.1 mix on that Dolby engine. Detection does not switch the audio to a stereo downmix.
+- Headphones set to Dolby Atmos for Headphones keep the IAMF mix on Dolby. They are not switched to a stereo downmix.
 - One visible YouTube tab owns the clock.
 - This is a per-user Windows install, not a Chrome Web Store package.
 
@@ -90,19 +92,21 @@ YouTube Surround משמיע זרם IAMF אמיתי מ־YouTube ב־Windows. אי
 
 | בחירה | מה מתנגן |
 | --- | --- |
-| Auto Detect | נבדק התקן ברירת המחדל. שישה ערוצים יוצאים כ־5.1 ישיר. בהתקן מרחבי מתנגנת הפריסה שהמצגת עצמה מצהירה עליה, כולל ערוצי גובה ואובייקטים כשהם קיימים. מצגת של 5.1 בלבד נשארת מיטת 5.1. אחרת מתנגן דאוןמיקס לסטריאו. |
+| Auto Detect | עוקב אחרי התקן ההשמעה של Windows. רמקולים של שישה ערוצים מנגנים 5.1 ישיר. אוזניות מרחביות מנגנות את מיקס ה־IAMF של הסרטון. בלי מקור אחר מתנגן סטריאו. |
 | 5.1 Speakers | שישה ערוצים נפרדים: קדמי שמאל, קדמי ימין, מרכז, סאב, סראונד שמאל, סראונד ימין. |
-| Dolby Atmos Headphones | המיקס של IAMF נשאר על Dolby Atmos for Headphones כשזה פורמט הסאונד המרחבי של Windows. ערוצי גובה ואובייקטים נכללים כשהמצגת מכילה אותם. מצגת 5.1 נשארת מיטת 5.1, בלי נפילה לדאוןמיקס. |
-| Surround Headphones | פלט רב־ערוצי כשההתקן של Windows כבר מקבל שישה ערוצים. |
+| Dolby Atmos Headphones | מנגן את מיקס ה־IAMF דרך Dolby Atmos for Headphones כש־Windows משתמש בפורמט הזה. |
+| Surround Headphones | שמע רב־ערוצי כש־Windows כבר מוגדר לשישה ערוצים. |
 | Stereo Headphones | דאוןמיקס ששומר על המרכז, הסראונד והסאב. |
 
-בחלון מופיעים המסלול שבאמת פעיל, שם ההתקן, והודעה ברורה אם המצב שנבחר לא נפתח. הניגון עוקב אחרי התקן ההשמעה של Windows. אוזניות שנבחרו רק לשיחות לא לוקחות את הסרט. חיבור אוזניות או רמקולים בזמן הניגון מעביר את הפלט להתקן החדש. Test Audio משמיע צליל אחד בכל ערוץ.
+על הנגן מופיע מה שבאמת מתנגן: **Full spatial**, **Spatial bed**, **Direct 5.1** או **Stereo**, יחד עם שם ההתקן. Full spatial הוא ערוצי הגובה והאובייקטים הנעים של הסרטון. Spatial bed הוא מיקס 5.1. אם המצב שנבחר לא נפתח, ההודעה מופיעה בחלון התוסף.
+
+חיבור אוזניות או רמקולים באמצע הסרטון מעביר את הפלט להתקן החדש, גם אם הסרטון התחיל ברמקולים. אוזניות שנבחרו רק לשיחות לא לוקחות את הסרט. Test Audio משמיע צליל אחד בכל ערוץ.
 
 5.1 ישיר דורש פורמט משותף של שישה ערוצים. סדר הרמקולים: קדמי שמאל, קדמי ימין, מרכז, סאב, סראונד שמאל, סראונד ימין.
 
 ## הורדה
 
-קובץ ההתקנה נמצא בשחרור [YouTube Surround 1.3.0](https://github.com/elad0elad/youtube-surround/releases/tag/v1.3.0). מריצים את `YouTube.Surround.Setup.exe`. בסיום נפתחות ההוראות.
+קובץ ההתקנה נמצא בשחרור [YouTube Surround 1.4.0](https://github.com/elad0elad/youtube-surround/releases/tag/v1.4.0). מריצים את `YouTube.Surround.Setup.exe`. בסיום נפתחות ההוראות.
 
 ## התקנה מקוד המקור
 

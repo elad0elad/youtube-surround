@@ -124,6 +124,181 @@ const BED_312: &[Speaker] = &[
     speaker(45.0, 30.0, false),
     speaker(-45.0, 30.0, false),
 ];
+// Expanded parent layouts. Angles and order are iamf-rs
+// `binaural::speakers::layout_sources`, which is the rendering order of
+// these loudspeaker_layout ids. Elevation is the library's own value.
+const BED_916: &[Speaker] = &[
+    speaker(60.0, 0.0, false),
+    speaker(-60.0, 0.0, false),
+    speaker(0.0, 0.0, false),
+    speaker(45.0, -30.0, true),
+    speaker(135.0, 0.0, false),
+    speaker(-135.0, 0.0, false),
+    speaker(30.0, 0.0, false),
+    speaker(-30.0, 0.0, false),
+    speaker(90.0, 0.0, false),
+    speaker(-90.0, 0.0, false),
+    speaker(45.0, 45.0, false),
+    speaker(-45.0, 45.0, false),
+    speaker(135.0, 45.0, false),
+    speaker(-135.0, 45.0, false),
+    speaker(90.0, 45.0, false),
+    speaker(-90.0, 45.0, false),
+];
+const BED_222: &[Speaker] = &[
+    speaker(60.0, 0.0, false),
+    speaker(-60.0, 0.0, false),
+    speaker(0.0, 0.0, false),
+    speaker(45.0, -30.0, true),
+    speaker(135.0, 0.0, false),
+    speaker(-135.0, 0.0, false),
+    speaker(30.0, 0.0, false),
+    speaker(-30.0, 0.0, false),
+    speaker(180.0, 0.0, false),
+    speaker(-45.0, -30.0, true),
+    speaker(90.0, 0.0, false),
+    speaker(-90.0, 0.0, false),
+    speaker(45.0, 45.0, false),
+    speaker(-45.0, 45.0, false),
+    speaker(0.0, 45.0, false),
+    speaker(0.0, 90.0, false),
+    speaker(135.0, 45.0, false),
+    speaker(-135.0, 45.0, false),
+    speaker(90.0, 45.0, false),
+    speaker(-90.0, 45.0, false),
+    speaker(180.0, 45.0, false),
+    speaker(0.0, -30.0, false),
+    speaker(45.0, -30.0, false),
+    speaker(-45.0, -30.0, false),
+];
+const BED_7154: &[Speaker] = &[
+    speaker(30.0, 0.0, false),
+    speaker(-30.0, 0.0, false),
+    speaker(0.0, 0.0, false),
+    speaker(45.0, -30.0, true),
+    speaker(90.0, 0.0, false),
+    speaker(-90.0, 0.0, false),
+    speaker(135.0, 0.0, false),
+    speaker(-135.0, 0.0, false),
+    speaker(45.0, 45.0, false),
+    speaker(-45.0, 45.0, false),
+    speaker(0.0, 90.0, false),
+    speaker(135.0, 45.0, false),
+    speaker(-135.0, 45.0, false),
+    speaker(45.0, -30.0, false),
+    speaker(-45.0, -30.0, false),
+    speaker(135.0, -30.0, false),
+    speaker(-135.0, -30.0, false),
+];
+// Sound-system beds that are not a loudspeaker_layout 0..=8. Order and
+// angles are iamf-rs `olr_speakers`. Names stay on the enum when the
+// common nickname would collide with a different layout.
+const BED_E: &[Speaker] = &[
+    speaker(30.0, 0.0, false),
+    speaker(-30.0, 0.0, false),
+    speaker(0.0, 0.0, false),
+    speaker(45.0, -30.0, true),
+    speaker(110.0, 0.0, false),
+    speaker(-110.0, 0.0, false),
+    speaker(30.0, 30.0, false),
+    speaker(-30.0, 30.0, false),
+    speaker(110.0, 30.0, false),
+    speaker(-110.0, 30.0, false),
+    speaker(0.0, -30.0, false),
+];
+const BED_F: &[Speaker] = &[
+    speaker(0.0, 0.0, false),
+    speaker(30.0, 0.0, false),
+    speaker(-30.0, 0.0, false),
+    speaker(45.0, 30.0, false),
+    speaker(-45.0, 30.0, false),
+    speaker(90.0, 0.0, false),
+    speaker(-90.0, 0.0, false),
+    speaker(135.0, 0.0, false),
+    speaker(-135.0, 0.0, false),
+    speaker(180.0, 45.0, false),
+    speaker(45.0, -30.0, true),
+    speaker(-45.0, -30.0, true),
+];
+const BED_G: &[Speaker] = &[
+    speaker(30.0, 0.0, false),
+    speaker(-30.0, 0.0, false),
+    speaker(0.0, 0.0, false),
+    speaker(45.0, -30.0, true),
+    speaker(90.0, 0.0, false),
+    speaker(-90.0, 0.0, false),
+    speaker(135.0, 0.0, false),
+    speaker(-135.0, 0.0, false),
+    speaker(45.0, 30.0, false),
+    speaker(-45.0, 30.0, false),
+    speaker(135.0, 30.0, false),
+    speaker(-135.0, 30.0, false),
+    speaker(22.5, 0.0, false),
+    speaker(-22.5, 0.0, false),
+];
+const BED_H: &[Speaker] = &[
+    speaker(60.0, 0.0, false),
+    speaker(-60.0, 0.0, false),
+    speaker(0.0, 0.0, false),
+    speaker(45.0, -30.0, true),
+    speaker(135.0, 0.0, false),
+    speaker(-135.0, 0.0, false),
+    speaker(30.0, 0.0, false),
+    speaker(-30.0, 0.0, false),
+    speaker(180.0, 0.0, false),
+    speaker(-45.0, -30.0, true),
+    speaker(90.0, 0.0, false),
+    speaker(-90.0, 0.0, false),
+    speaker(45.0, 30.0, false),
+    speaker(-45.0, 30.0, false),
+    speaker(0.0, 30.0, false),
+    speaker(0.0, 90.0, false),
+    speaker(135.0, 30.0, false),
+    speaker(-135.0, 30.0, false),
+    speaker(90.0, 30.0, false),
+    speaker(-90.0, 30.0, false),
+    speaker(180.0, 30.0, false),
+    speaker(0.0, -30.0, false),
+    speaker(45.0, -30.0, false),
+    speaker(-45.0, -30.0, false),
+];
+const BED_EXT916: &[Speaker] = &[
+    speaker(60.0, 0.0, false),
+    speaker(-60.0, 0.0, false),
+    speaker(0.0, 0.0, false),
+    speaker(45.0, -30.0, true),
+    speaker(135.0, 0.0, false),
+    speaker(-135.0, 0.0, false),
+    speaker(30.0, 0.0, false),
+    speaker(-30.0, 0.0, false),
+    speaker(90.0, 0.0, false),
+    speaker(-90.0, 0.0, false),
+    speaker(45.0, 30.0, false),
+    speaker(-45.0, 30.0, false),
+    speaker(135.0, 30.0, false),
+    speaker(-135.0, 30.0, false),
+    speaker(90.0, 30.0, false),
+    speaker(-90.0, 30.0, false),
+];
+const BED_EXT7154: &[Speaker] = &[
+    speaker(30.0, 0.0, false),
+    speaker(-30.0, 0.0, false),
+    speaker(0.0, 0.0, false),
+    speaker(45.0, -30.0, true),
+    speaker(90.0, 0.0, false),
+    speaker(-90.0, 0.0, false),
+    speaker(135.0, 0.0, false),
+    speaker(-135.0, 0.0, false),
+    speaker(45.0, 30.0, false),
+    speaker(-45.0, 30.0, false),
+    speaker(0.0, 90.0, false),
+    speaker(135.0, 30.0, false),
+    speaker(-135.0, 30.0, false),
+    speaker(45.0, -30.0, false),
+    speaker(-45.0, -30.0, false),
+    speaker(135.0, -30.0, false),
+    speaker(-135.0, -30.0, false),
+];
 
 fn layout_speakers(layout: u8) -> Option<(&'static str, &'static [Speaker])> {
     Some(match layout {
@@ -136,6 +311,9 @@ fn layout_speakers(layout: u8) -> Option<(&'static str, &'static [Speaker])> {
         6 => ("7.1.2", BED_712),
         7 => ("7.1.4", BED_714),
         8 => ("3.1.2", BED_312),
+        16 => ("9.1.6", BED_916),
+        17 => ("22.2", BED_222),
+        18 => ("7.1.5.4", BED_7154),
         _ => return None,
     })
 }
@@ -150,7 +328,13 @@ fn system_speakers(system: SoundSystem) -> Option<(&'static str, &'static [Speak
         SoundSystem::I => 5,
         SoundSystem::Ext712 => 6,
         SoundSystem::J => 7,
-        SoundSystem::Ext312 => 8,
+        SoundSystem::Ext312 => return Some(("3.1.2", BED_312)),
+        SoundSystem::E => return Some(("BS.2051-E", BED_E)),
+        SoundSystem::F => return Some(("BS.2051-F", BED_F)),
+        SoundSystem::G => return Some(("9.1.4", BED_G)),
+        SoundSystem::H => return Some(("22.2", BED_H)),
+        SoundSystem::Ext916 => return Some(("9.1.6", BED_EXT916)),
+        SoundSystem::Ext7154 => return Some(("7.1.5.4", BED_EXT7154)),
         _ => return None,
     };
     layout_speakers(layout)
@@ -203,6 +387,7 @@ struct BedChannel {
 struct ObjectSlot {
     element: usize,
     plane: usize,
+    element_id: u32,
 }
 
 pub struct SpatialFactory {
@@ -236,6 +421,9 @@ struct Capture {
     beds: Vec<BedRef>,
     objects: Vec<ObjectSlot>,
     hoa_order: Vec<Option<u8>>,
+    bed_pcm: Vec<u8>,
+    object_pcm: Vec<u8>,
+    hoa_planes: Vec<Option<Vec<Vec<f32>>>>,
 }
 
 impl Capture {
@@ -244,11 +432,15 @@ impl Capture {
         let mut objects = Vec::new();
         let mut hoa_order = vec![None; config.elements.len()];
         let mut name = String::from("none");
+        let mut skipped = 0u16;
+        let mut ambisonics_orders: Vec<u8> = Vec::new();
         let hoa_target = if system_speakers(target).is_some() { target } else { SoundSystem::B };
+        let hoa_fallback = system_speakers(target).is_none();
         for (index, element) in config.elements.iter().enumerate() {
             match element.layout {
                 ElementLayout::Channels { loudspeaker_layout } => {
                     let Some((label, speakers)) = layout_speakers(loudspeaker_layout) else {
+                        skipped += 1;
                         eprintln!("spatial skip element {} layout {loudspeaker_layout}: no verified loudspeaker map", element.audio_element_id);
                         continue;
                     };
@@ -262,30 +454,45 @@ impl Capture {
                         name = "objects".to_string();
                     }
                     for plane in 0..usize::from(num_objects) {
-                        objects.push(ObjectSlot { element: index, plane });
+                        objects.push(ObjectSlot { element: index, plane, element_id: element.audio_element_id });
                     }
                 }
                 ElementLayout::Ambisonics { order } => {
-                    let Some((label, speakers)) = system_speakers(hoa_target) else { continue };
+                    let Some((label, speakers)) = system_speakers(hoa_target) else {
+                        skipped += 1;
+                        eprintln!("spatial skip element {}: ambisonics target has no verified loudspeaker map", element.audio_element_id);
+                        continue;
+                    };
                     if name == "none" {
-                        name = label.to_string();
+                        name = format!("ambisonics-{order}");
+                        let _ = label;
                     }
+                    ambisonics_orders.push(order);
                     hoa_order[index] = Some(order);
                     push_speakers(&mut beds, index, speakers, true);
                 }
                 _ => {
+                    skipped += 1;
                     eprintln!("spatial skip element {}: unsupported element layout", element.audio_element_id);
                 }
             }
         }
+        if !objects.is_empty() && beds.iter().any(|bed| !bed.ambisonics) && name != "objects" {
+            name = format!("{name}+objects");
+        }
+        let ambisonics = ambisonics_orders.len() as u16;
+        let fallback = if hoa_fallback && ambisonics > 0 { "ambisonics-on-5.1" } else { "none" };
         let heights = beds.iter().filter(|bed| bed.channel.elevation.abs() >= 20.0 && !bed.channel.lfe).count() as u16;
         let mut file = File::create(path).map_err(|err| DecodeError::UnsupportedRenderer(err.to_string()))?;
         file.write_all(b"YSP1").map_err(|err| DecodeError::UnsupportedRenderer(err.to_string()))?;
-        file.write_all(&1u16.to_le_bytes()).map_err(io_err)?;
+        file.write_all(&2u16.to_le_bytes()).map_err(io_err)?;
         file.write_all(&config.sample_rate.to_le_bytes()).map_err(io_err)?;
         file.write_all(&(beds.len() as u16).to_le_bytes()).map_err(io_err)?;
         file.write_all(&(objects.len() as u16).to_le_bytes()).map_err(io_err)?;
         file.write_all(&heights.to_le_bytes()).map_err(io_err)?;
+        file.write_all(&0u32.to_le_bytes()).map_err(io_err)?;
+        file.write_all(&ambisonics.to_le_bytes()).map_err(io_err)?;
+        file.write_all(&skipped.to_le_bytes()).map_err(io_err)?;
         for bed in &beds {
             let bed = &bed.channel;
             file.write_all(&bed.kind.to_le_bytes()).map_err(io_err)?;
@@ -294,9 +501,13 @@ impl Capture {
             file.write_all(&bed.distance.to_le_bytes()).map_err(io_err)?;
             file.write_all(&[u8::from(bed.lfe)]).map_err(io_err)?;
         }
+        for slot in &objects {
+            file.write_all(&slot.element_id.to_le_bytes()).map_err(io_err)?;
+            file.write_all(&(slot.plane as u16).to_le_bytes()).map_err(io_err)?;
+        }
         file.flush().map_err(io_err)?;
         eprintln!(
-            "spatial bed={} heights={heights} objects={} name={name} rate={}",
+            "spatial bed={} heights={heights} objects={} name={name} rate={} skipped={skipped} ambisonics={ambisonics} fallback={fallback}",
             beds.len(),
             objects.len(),
             config.sample_rate
@@ -309,6 +520,9 @@ impl Capture {
             beds,
             objects,
             hoa_order,
+            bed_pcm: Vec::new(),
+            object_pcm: Vec::new(),
+            hoa_planes: Vec::new(),
         }))
     }
 }
@@ -338,17 +552,24 @@ impl MixRenderer for Capture {
     fn render(&mut self, elements: &[ElementFrame<'_>]) -> Result<Vec<Vec<f32>>, DecodeError> {
         let frames = elements.iter().find_map(|e| e.planes.first().map(Vec::len)).unwrap_or(0);
         if frames > 0 {
-            let mut rendered: Vec<Option<Vec<Vec<f32>>>> = vec![None; elements.len()];
+            if self.hoa_planes.len() != elements.len() {
+                self.hoa_planes = vec![None; elements.len()];
+            }
+            for plane in &mut self.hoa_planes {
+                *plane = None;
+            }
             for (index, order) in self.hoa_order.iter().enumerate() {
                 let Some(order) = *order else { continue };
                 let Some(element) = elements.get(index) else { continue };
                 let target = if system_speakers(self.target).is_some() { self.target } else { SoundSystem::B };
-                rendered[index] = ambisonics_planes(order, element.planes, target).ok();
+                self.hoa_planes[index] = ambisonics_planes(order, element.planes, target).ok();
             }
-            let mut interleaved = vec![0u8; frames * self.beds.len() * 2];
+            let bed_bytes = frames * self.beds.len() * 2;
+            self.bed_pcm.clear();
+            self.bed_pcm.resize(bed_bytes, 0);
             for (bed_index, bed) in self.beds.iter().enumerate() {
                 let samples = if bed.ambisonics {
-                    rendered.get(bed.element).and_then(|item| item.as_ref()).and_then(|planes| planes.get(bed.plane))
+                    self.hoa_planes.get(bed.element).and_then(|item| item.as_ref()).and_then(|planes| planes.get(bed.plane))
                 } else {
                     elements.get(bed.element).and_then(|item| item.planes.get(bed.plane))
                 };
@@ -356,11 +577,12 @@ impl MixRenderer for Capture {
                     let sample = samples.and_then(|p| p.get(frame)).copied().unwrap_or(0.0);
                     let pcm = quantize(sample);
                     let at = (frame * self.beds.len() + bed_index) * 2;
-                    interleaved[at..at + 2].copy_from_slice(&pcm.to_le_bytes());
+                    self.bed_pcm[at..at + 2].copy_from_slice(&pcm.to_le_bytes());
                 }
             }
             self.file.write_all(&(frames as u32).to_le_bytes()).map_err(io_err)?;
-            self.file.write_all(&interleaved).map_err(io_err)?;
+            self.file.write_all(&self.bed_pcm).map_err(io_err)?;
+            self.object_pcm.resize(frames * 2, 0);
             for slot in &self.objects {
                 let element = elements.get(slot.element);
                 let position = element.and_then(|item| item.object_positions.get(slot.plane));
@@ -372,16 +594,16 @@ impl MixRenderer for Capture {
                 self.file.write_all(&el.to_le_bytes()).map_err(io_err)?;
                 self.file.write_all(&dist.to_le_bytes()).map_err(io_err)?;
                 self.file.write_all(&[valid]).map_err(io_err)?;
-                let mut pcm = vec![0u8; frames * 2];
+                self.object_pcm.fill(0);
                 if valid == 1 {
                     if let Some(samples) = element.and_then(|item| item.planes.get(slot.plane)) {
                         for frame in 0..frames {
                             let sample = samples.get(frame).copied().unwrap_or(0.0);
-                            pcm[frame * 2..frame * 2 + 2].copy_from_slice(&quantize(sample).to_le_bytes());
+                            self.object_pcm[frame * 2..frame * 2 + 2].copy_from_slice(&quantize(sample).to_le_bytes());
                         }
                     }
                 }
-                self.file.write_all(&pcm).map_err(io_err)?;
+                self.file.write_all(&self.object_pcm).map_err(io_err)?;
             }
             self.file.flush().map_err(io_err)?;
         }
@@ -393,13 +615,25 @@ fn quantize(sample: f32) -> i16 {
     (sample.clamp(-1.0, 1.0) * 32767.0) as i16
 }
 
-/// Richest loudspeaker layout the selected mix presentation declares.
-/// Binaural is not a Windows loudspeaker bed, so it is not chosen here.
-pub fn presentation_target(descriptors: &[u8]) -> Result<SoundSystem, String> {
+pub struct SpatialTarget {
+    pub system: SoundSystem,
+    pub name: &'static str,
+    pub presentations: usize,
+    /// Why a richer declared layout was not used. `none` when the chosen
+    /// layout is the richest one with a verified loudspeaker map.
+    pub fallback: &'static str,
+    pub skipped_binaural: bool,
+}
+
+/// Richest loudspeaker layout any mix presentation declares, limited to
+/// sound systems whose speaker angles are known. Binaural is not a
+/// Windows loudspeaker bed. Layouts without a verified map are skipped.
+pub fn presentation_target(descriptors: &[u8]) -> Result<SpatialTarget, String> {
     let parsed = iamf_dec::presentation::Descriptors::collect(descriptors)
         .map_err(|err| err.to_string())?;
-    let mut best: Option<SoundSystem> = None;
-    let mut best_channels = 0usize;
+    let mut systems = Vec::new();
+    let mut saw_binaural = false;
+    let mut saw_unmapped = false;
     for mix in &parsed.mix_presentations {
         for sub in &mix.sub_mixes {
             for (layout, _) in &sub.layouts {
@@ -409,19 +643,44 @@ pub fn presentation_target(descriptors: &[u8]) -> Result<SoundSystem, String> {
                     }
                     _ => None,
                 };
-                let Some(system) = system else { continue };
+                let Some(system) = system else {
+                    saw_unmapped = true;
+                    continue;
+                };
                 if system == SoundSystem::Binaural {
+                    saw_binaural = true;
                     continue;
                 }
-                let channels = system.channels();
-                if channels > best_channels {
-                    best = Some(system);
-                    best_channels = channels;
-                }
+                systems.push(system);
             }
         }
     }
-    best.ok_or_else(|| "the mix presentation declares no loudspeaker layout".to_string())
+    let Some((system, name)) = richest_mapped(&systems) else {
+        return Err("the mix presentation declares no loudspeaker layout with a verified speaker map".to_string());
+    };
+    Ok(SpatialTarget {
+        system,
+        name,
+        presentations: parsed.mix_presentations.len(),
+        fallback: if saw_unmapped { "layout-without-speaker-map" } else { "none" },
+        skipped_binaural: saw_binaural,
+    })
+}
+
+fn richest_mapped(systems: &[SoundSystem]) -> Option<(SoundSystem, &'static str)> {
+    let mut best: Option<(SoundSystem, &'static str, usize)> = None;
+    for system in systems {
+        let Some((name, speakers)) = system_speakers(*system) else { continue };
+        let channels = speakers.len();
+        let replace = match best {
+            Some((_, _, best_channels)) => channels > best_channels,
+            None => true,
+        };
+        if replace {
+            best = Some((*system, name, channels));
+        }
+    }
+    best.map(|(system, name, _)| (system, name))
 }
 
 pub fn ambisonics_planes(order: u8, planes: &[Vec<f32>], target: SoundSystem) -> Result<Vec<Vec<f32>>, DecodeError> {
@@ -439,4 +698,85 @@ pub fn ambisonics_planes(order: u8, planes: &[Vec<f32>], target: SoundSystem) ->
 
 pub fn factory(path: String, target: SoundSystem) -> Arc<SpatialFactory> {
     Arc::new(SpatialFactory::new(path, target))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn verified_layouts_keep_their_channel_counts() {
+        let cases = [
+            (2u8, 6, "5.1"),
+            (7, 12, "7.1.4"),
+            (16, 16, "9.1.6"),
+            (17, 24, "22.2"),
+            (18, 17, "7.1.5.4"),
+        ];
+        for (layout, channels, name) in cases {
+            let (label, speakers) = layout_speakers(layout).unwrap();
+            assert_eq!(label, name);
+            assert_eq!(speakers.len(), channels);
+        }
+        assert!(layout_speakers(19).is_none());
+    }
+
+    #[test]
+    fn static_types_require_the_windows_angle() {
+        let bed = layout_speakers(2).unwrap().1;
+        assert_eq!(static_type(bed[0]), TYPE_FRONT_LEFT);
+        assert_eq!(static_type(bed[3]), TYPE_LFE);
+        assert_eq!(static_type(bed[4]), TYPE_DYNAMIC);
+        let wide = layout_speakers(16).unwrap().1;
+        assert_eq!(static_type(wide[0]), TYPE_DYNAMIC);
+        assert_eq!(static_type(wide[10]), TYPE_DYNAMIC);
+        let height = layout_speakers(7).unwrap().1;
+        assert_eq!(static_type(height[8]), TYPE_TOP_FRONT_LEFT);
+        assert_eq!(static_type(height[10]), TYPE_TOP_BACK_LEFT);
+    }
+
+    #[test]
+    fn richest_mapped_skips_a_system_without_speakers() {
+        let chosen = richest_mapped(&[SoundSystem::Binaural, SoundSystem::B, SoundSystem::J]);
+        let (_, name) = chosen.unwrap();
+        assert_eq!(name, "7.1.4");
+    }
+
+    #[test]
+    fn real_samples_select_a_verified_layout() {
+        let samples = [
+            r"C:\Users\elad0\Downloads\youtube_iamf.m4a",
+            r"C:\Users\elad0\YT5.1\youtube-surround\third_party\iamf-rs\docs\media\iamf_alternating_sine_waves_stereo.mp4",
+            r"C:\Users\elad0\YT5.1\youtube-surround\third_party\iamf-rs\docs\media\iamf_v2_object_orbit.mp4",
+        ];
+        for path in samples {
+            let file = std::path::Path::new(path);
+            if !file.exists() {
+                continue;
+            }
+            let track = crate::fmp4::read_iamf_mp4(file).unwrap();
+            let parsed = iamf_dec::presentation::Descriptors::collect(&track.descriptors).unwrap();
+            let mut listed = String::new();
+            for mix in &parsed.mix_presentations {
+                for sub in &mix.sub_mixes {
+                    for (layout, _) in &sub.layouts {
+                        let system = match layout {
+                            iamf_obu::descriptors::Layout::LoudspeakersSsConvention { sound_system } => {
+                                SoundSystem::from_bitstream_sound_system(*sound_system)
+                            }
+                            _ => None,
+                        };
+                        listed.push_str(&format!(" {system:?}"));
+                    }
+                }
+            }
+            let choice = presentation_target(&track.descriptors).unwrap();
+            assert!(system_speakers(choice.system).is_some(), "{path} {listed}");
+            // These samples declare a stereo playback layout. The 7.1.4 or
+            // object data lives on the audio element, which the capture
+            // reads separately. Do not expect the presentation list itself
+            // to say 7.1.4.
+            assert_eq!(choice.name, "stereo", "{path} layouts:{listed}");
+        }
+    }
 }

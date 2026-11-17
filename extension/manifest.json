@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "YouTube Surround",
-  "version": "1.3.0",
-  "description": "Plays real YouTube IAMF as direct 5.1, a spatial bed, or a stereo downmix. © elad0elad",
+  "version": "1.4.0",
+  "description": "Plays real YouTube IAMF as full spatial, a 5.1 bed, direct 5.1, or stereo. © elad0elad",
   "author": "elad0elad",
   "homepage_url": "https://github.com/elad0elad/youtube-surround",
   "permissions": ["nativeMessaging", "storage", "tabs"],

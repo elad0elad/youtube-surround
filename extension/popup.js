@@ -14,7 +14,22 @@ const fields = [
   ["outputPath", "Output path"],
   ["rendering", "Rendering"],
   ["renderChannels", "Render channels"],
-  ["spatialEngine", "Spatial engine"]
+  ["spatialEngine", "Spatial engine"],
+  ["sourceLayout", "Source layout"],
+  ["presentations", "IAMF presentations"],
+  ["bedChannels", "Bed channels"],
+  ["heights", "Height channels"],
+  ["sourceObjects", "Audio objects"],
+  ["staticChannels", "Static spatial channels"],
+  ["dynamicObjects", "Dynamic spatial objects"],
+  ["ambisonics", "Ambisonics elements"],
+  ["unsupported", "Unsupported elements"],
+  ["fallback", "Fallback"],
+  ["binaural", "Binaural layout"],
+  ["objectMotion", "Object motion"],
+  ["underruns", "Underruns"],
+  ["deviceSwitches", "Device switches"],
+  ["startupMs", "Time to first audio"]
 ];
 
 const stateLabels = {
@@ -39,8 +54,7 @@ const pathLabels = {
 
 function render(status) {
   const activeLabel = pathLabels[status.outputPath] || "Playing";
-  const dolby = status.outputPath === "spatial-bed" && /dolby atmos/i.test(status.spatialEngine || "");
-  document.getElementById("state").textContent = status.state === "active" ? (dolby ? "Dolby Atmos" : activeLabel) : (stateLabels[status.state] || status.state || "Waiting");
+  document.getElementById("state").textContent = status.state === "active" ? activeLabel : (stateLabels[status.state] || status.state || "Waiting");
   document.getElementById("enabled").checked = status.enabled !== false;
   document.getElementById("automatic").classList.toggle("on", status.mode !== "manual");
   document.getElementById("manual").classList.toggle("on", status.mode === "manual");
@@ -49,6 +63,7 @@ function render(status) {
   const route = [];
   if (status.device) route.push(status.device);
   if (status.renderChannels) route.push(status.renderChannels + " ch");
+  if (status.sourceLayout) route.push(status.sourceLayout);
   if (status.outputPath === "spatial-bed" || status.outputPath === "full-spatial") route.push(status.spatialEngine || "Windows Spatial Audio");
   document.getElementById("route").textContent = route.join(" · ");
   document.getElementById("outputError").textContent = status.outputError || "";
@@ -62,7 +77,7 @@ function render(status) {
     const dd = document.createElement("dd");
     let value = status[key];
     if (key === "bufferSeconds") value = Number(value).toFixed(1) + " s";
-    if (key === "latencyMs") value = Math.round(Number(value)) + " ms";
+    if (key === "latencyMs" || key === "startupMs") value = Math.round(Number(value)) + " ms";
     if (key === "sampleRate") value = value + " Hz";
     dd.textContent = String(value);
     dl.append(dt, dd);

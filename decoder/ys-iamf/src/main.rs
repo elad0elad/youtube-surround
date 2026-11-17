@@ -45,7 +45,7 @@ fn main() -> ExitCode {
                      ys-iamf --follow - -o <output.wav> [--max-seconds N] [--spatial]\n\
                      Renders IAMF to 6-channel 5.1 PCM (L R C LFE Ls Rs). Fails if the\n\
                      decoder does not produce six channels.\n\
-                     --spatial also writes <output>.ysp from the mix presentation's own\n\
+                     --spatial also writes <output>.ysp from the richest verified\n\
                      loudspeaker layout and any audio objects. The 5.1 WAV is unchanged.\n\
                      --follow reads a growing MP4 from stdin and writes PCM as fragments arrive."
                 );
@@ -584,17 +584,28 @@ fn drain_buffer(
 
 fn open_spatial(descriptors: &[u8], wav_path: &str) -> Result<StreamDecoder, String> {
     let target = spatial::presentation_target(descriptors)?;
+    let binaural = if target.skipped_binaural { "skipped" } else { "none" };
+    eprintln!(
+        "spatial plan presentations={} target={} channels={} fallback={} binaural={binaural}",
+        target.presentations,
+        target.name,
+        target.system.channels(),
+        target.fallback
+    );
     let ysp = std::path::Path::new(wav_path).with_extension("ysp");
-    let factory = spatial::factory(ysp.to_string_lossy().into_owned(), target);
+    let factory = spatial::factory(ysp.to_string_lossy().into_owned(), target.system);
     let codec = DefaultFactory;
     let mut settings = StreamSettings::default();
-    settings.layout = Some(target);
+    settings.layout = Some(target.system);
     settings.sample_type = Some(OutputSampleType::Int16LittleEndian);
     settings.channel_ordering = ChannelOrdering::Iamf;
     settings.requested_profiles = ProfileSet::all();
     settings.enable_limiter = false;
-    StreamDecoder::new_from_descriptors_with_renderer(descriptors, settings, &codec, factory)
-        .map_err(|err| err.to_string())
+    let decoder = StreamDecoder::new_from_descriptors_with_renderer(descriptors, settings, &codec, factory)
+        .map_err(|err| err.to_string())?;
+    let (mix, _) = decoder.selected_mix();
+    eprintln!("spatial mix={mix}");
+    Ok(decoder)
 }
 
 fn pull_spatial(decoder: &mut StreamDecoder) {

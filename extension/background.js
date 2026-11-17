@@ -31,6 +31,7 @@ function broadcast() {
 }
 
 let connectFailedAt = 0;
+let resumeAt = 0;
 let leaveTimer = null;
 let leaveTabId = null;
 let leaveToken = null;
@@ -112,11 +113,19 @@ function connect() {
   try { port.postMessage({ type: "set-output", output: status.output || "auto" }); } catch (err) {}
   port.onDisconnect.addListener(() => {
     const reason = chrome.runtime.lastError && chrome.runtime.lastError.message;
+    const resume = status.videoId && (status.state === "active" || status.state === "decoding" || status.state === "checking");
+    const tabId = activeTabId;
     connectFailedAt = Date.now();
     port = null;
     status.state = "error";
-    status.detail = reason || "The Windows audio component is not installed.";
+    status.detail = reason || "The Windows audio component stopped. Reconnecting.";
     broadcast();
+    if (resume && tabId != null && Date.now() - resumeAt > 10000) {
+      resumeAt = Date.now();
+      setTimeout(() => {
+        chrome.tabs.sendMessage(tabId, { type: "rescan" }).catch(() => {});
+      }, 400);
+    }
   });
 }
 
