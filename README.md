@@ -26,7 +26,7 @@ Direct 5.1 needs a shared format that is already six channels. The speaker order
 
 ## Download
 
-The current Windows installer is [YouTube Surround 1.4.0](https://github.com/elad0elad/youtube-surround/releases/tag/v1.4.0). Run `YouTube.Surround.Setup.exe`. The guide opens when installation finishes.
+The current Windows installer is [YouTube Surround 1.4.1](https://github.com/elad0elad/youtube-surround/releases/tag/v1.4.1). Run `YouTube.Surround.Setup.exe`. The guide opens when installation finishes.
 
 ## Install from source
 
@@ -106,7 +106,7 @@ YouTube Surround משמיע זרם IAMF אמיתי מ־YouTube ב־Windows. אי
 
 ## הורדה
 
-קובץ ההתקנה נמצא בשחרור [YouTube Surround 1.4.0](https://github.com/elad0elad/youtube-surround/releases/tag/v1.4.0). מריצים את `YouTube.Surround.Setup.exe`. בסיום נפתחות ההוראות.
+קובץ ההתקנה נמצא בשחרור [YouTube Surround 1.4.1](https://github.com/elad0elad/youtube-surround/releases/tag/v1.4.1). מריצים את `YouTube.Surround.Setup.exe`. בסיום נפתחות ההוראות.
 
 ## התקנה מקוד המקור
 
