@@ -7,6 +7,46 @@ $Root = Split-Path -Parent $PSScriptRoot
 $Dest = Join-Path $env:LOCALAPPDATA "YouTubeSurround"
 $HostName = "com.youtubesurround.host"
 
+function Show-InstallerWindow {
+    if (-not ("InstallerWindow" -as [type])) {
+        Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public class InstallerWindow {
+    [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr handle, int command);
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr handle);
+}
+"@
+    }
+    $handle = [InstallerWindow]::GetConsoleWindow()
+    if ($handle -eq [IntPtr]::Zero) { return }
+    [InstallerWindow]::ShowWindow($handle, 9) | Out-Null
+    [InstallerWindow]::SetForegroundWindow($handle) | Out-Null
+}
+
+function Show-InstallerMessage([string]$Text, [string]$Kind) {
+    Add-Type -AssemblyName System.Windows.Forms
+    $icon = [System.Windows.Forms.MessageBoxIcon]::Information
+    if ($Kind -eq "error") { $icon = [System.Windows.Forms.MessageBoxIcon]::Error }
+    [void][System.Windows.Forms.MessageBox]::Show(
+        $Text,
+        "YouTube Surround",
+        [System.Windows.Forms.MessageBoxButtons]::OK,
+        $icon)
+}
+
+Show-InstallerWindow
+trap {
+    try {
+        Show-InstallerWindow
+        Show-InstallerMessage ("Installation failed.`r`n`r`n" + $_.Exception.Message) "error"
+    } catch {
+        Write-Host $_.Exception.Message
+    }
+    exit 1
+}
+
 function Extension-Id([string]$Key) {
     $bytes = [Convert]::FromBase64String($Key)
     $sha = [System.Security.Cryptography.SHA256]::Create().ComputeHash($bytes)
@@ -49,14 +89,25 @@ if ($Uninstall) {
     return
 }
 
-$manifestPath = $null
+$extensionFiles = @(
+    "manifest.json", "background.js", "content.js", "page-audio.js",
+    "popup.html", "popup.css", "popup.js"
+)
+$extensionSource = $null
 foreach ($candidate in @(
-    (Join-Path $PSScriptRoot "extension\manifest.json"),
-    (Join-Path $Root "extension\manifest.json")
+    (Join-Path $PSScriptRoot "extension"),
+    $PSScriptRoot,
+    (Join-Path $Root "extension")
 )) {
-    if (Test-Path -LiteralPath $candidate) { $manifestPath = $candidate; break }
+    $manifestCandidate = Join-Path $candidate "manifest.json"
+    $scriptCandidate = Join-Path $candidate "background.js"
+    if ((Test-Path -LiteralPath $manifestCandidate) -and (Test-Path -LiteralPath $scriptCandidate)) {
+        $extensionSource = $candidate
+        break
+    }
 }
-if (-not $manifestPath) { throw "extension manifest was not found" }
+if (-not $extensionSource) { throw "The extension files were not found next to the installer." }
+$manifestPath = Join-Path $extensionSource "manifest.json"
 $manifest = Get-Content $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
 if (-not $manifest.key) { throw "extension manifest has no key" }
 $extensionId = Extension-Id $manifest.key
@@ -102,10 +153,14 @@ Copy-Item -LiteralPath $hostExe -Destination (Join-Path $Dest "YouTubeSurroundHo
 Copy-Item -LiteralPath $decoder -Destination (Join-Path $Dest "ys-iamf.exe") -Force
 Copy-Item -LiteralPath $ytdlp -Destination (Join-Path $Dest "yt-dlp.exe") -Force
 Copy-Item -LiteralPath $deno -Destination (Join-Path $Dest "deno.exe") -Force
-$extSource = Split-Path -Parent $manifestPath
 $extDest = Join-Path $Dest "extension"
 if (Test-Path $extDest) { Remove-Item $extDest -Recurse -Force }
-Copy-Item -LiteralPath $extSource -Destination $extDest -Recurse -Force
+New-Item -ItemType Directory -Force -Path $extDest | Out-Null
+foreach ($name in $extensionFiles) {
+    $from = Join-Path $extensionSource $name
+    if (-not (Test-Path -LiteralPath $from)) { throw "The installer is missing $name." }
+    Copy-Item -LiteralPath $from -Destination (Join-Path $extDest $name) -Force
+}
 
 $hostManifest = @{
     name = $HostName
